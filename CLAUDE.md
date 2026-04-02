@@ -162,7 +162,8 @@ Check the Status table in README.md for which steps are done/in-progress.
 
 - Always create a branch for the step being worked on: `git checkout -b step/XX-name dev`
 - Make multiple atomic commits per step (not one giant commit)
-- When step is done: PR into `dev`
+- After EVERY commit: `git push` (or `git push -u origin <branch>` for first push on new branch) — Danel needs to see branches live on GitHub
+- When step is done: merge into `dev`, then `git push` dev immediately
 - Steps are meant to be asked one at a time: "Do step 01", "Do step 02", etc.
 - Claude should read this file + README.md at the start of any new session
 - Update the Status table in README.md when a step is completed
