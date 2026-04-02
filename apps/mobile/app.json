@@ -1,0 +1,62 @@
+{
+  "expo": {
+    "name": "LastNite",
+    "slug": "lastnite",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "lastnite",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#0A0A0A"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.lastnite.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "LastNite uses your camera to capture mission moments.",
+        "NSMicrophoneUsageDescription": "LastNite uses your microphone to record mission videos.",
+        "NSPhotoLibraryUsageDescription": "LastNite saves your event memories to your photo library.",
+        "NSPhotoLibraryAddUsageDescription": "LastNite saves your event memories to your photo library."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0A0A0A"
+      },
+      "package": "com.lastnite.app",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "LastNite uses your camera to capture mission moments."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#F5A623"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
