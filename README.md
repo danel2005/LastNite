@@ -498,7 +498,7 @@ This is the emotional climax of the app.
 |---|---|---|
 | Step 01 | `step/01-monorepo-setup` | ✅ Done |
 | Step 02 | `step/02-database-schema` | ✅ Done |
-| Step 03 | `step/03-backend-auth` | Not started |
+| Step 03 | `step/03-backend-auth` | ✅ Done |
 | Step 04 | `step/04-event-crud` | Not started |
 | Step 05 | `step/05-mission-engine` | Not started |
 | Step 06 | `step/06-live-event-api` | Not started |
