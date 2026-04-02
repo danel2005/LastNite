@@ -1,0 +1,9 @@
+{
+  "extends": "@lastnite/config/tsconfig",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src"
+  },
+  "include": ["src", "prisma"],
+  "exclude": ["node_modules", "dist"]
+}
