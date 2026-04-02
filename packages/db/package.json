@@ -18,6 +18,9 @@
   "dependencies": {
     "@prisma/client": "^5.22.0"
   },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
   "devDependencies": {
     "@lastnite/config": "*",
     "prisma": "^5.22.0",
