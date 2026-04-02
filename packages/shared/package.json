@@ -1,0 +1,26 @@
+{
+  "name": "@lastnite/shared",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Shared TypeScript types and contracts for LastNite",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src"
+  },
+  "devDependencies": {
+    "@lastnite/config": "*",
+    "tsup": "^8.3.0",
+    "typescript": "^5.5.0"
+  }
+}

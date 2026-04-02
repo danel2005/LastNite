@@ -1,0 +1,14 @@
+// LastNite Database Schema
+// Placeholder for Step 02 — full schema will be written there.
+// This file exists to prove Prisma is set up correctly in the monorepo.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Full schema: see step/02-database-schema
