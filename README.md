@@ -496,7 +496,7 @@ This is the emotional climax of the app.
 
 | Step | Branch | Status |
 |---|---|---|
-| Step 01 | `step/01-monorepo-setup` | Not started |
+| Step 01 | `step/01-monorepo-setup` | ✅ Done |
 | Step 02 | `step/02-database-schema` | Not started |
 | Step 03 | `step/03-backend-auth` | Not started |
 | Step 04 | `step/04-event-crud` | Not started |
