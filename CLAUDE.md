@@ -24,6 +24,12 @@ A private, temporary, mission-based social mobile app. Users create events (part
 
 3. **Private missions + Secret missions** — During the event, missions are fully private. Nobody can see what mission anyone else has. Some missions are marked `isSecret: true`. When a user receives a secret mission, they see a special card: "Shhhh... this one's a secret mission!" with a lock icon. When creating a custom mission, the creator can set it as secret or not via dropdown.
 
+4. **Battle missions (Duel mechanic)** — A hunter/target system. User A gets "Take a photo of UserB before they notice! (2 min timer!)" and UserB simultaneously gets "UserA is trying to photograph you — don't let them!" Whoever succeeds gets points. Final reveal has a "BATTLES!" section. Implemented as duo missions with `targetUserId` + a simultaneous "evade" assignment. Points are tracked on `MissionAssignment.points`.
+
+5. **Points system + Prize pot** — Harder/more embarrassing missions worth more points. Winner = most points at reveal. Event has a `prizePot` field (text, e.g. "20 shekel") agreed at creation.
+
+6. **Event templates expanded** — Not just parties. Includes: trek (view/environment missions), ski, wedding ("take a pic with the bride"), birthday, costume_party. Missions match the event type. Also captures pure scenery/environment for long events (treks, trips).
+
 ---
 
 ## Tech Stack
