@@ -10,6 +10,7 @@ import { meRoutes } from './routes/me.js'
 import { eventRoutes, inviteRoutes } from './routes/events.js'
 import { missionRoutes } from './routes/missions.js'
 import { liveEventRoutes } from './routes/live.js'
+import { submissionRoutes } from './routes/submissions.js'
 import { startEventScheduler } from './lib/event-scheduler.js'
 import { startMissionWorker, stopMissionWorker } from './jobs/mission-worker.js'
 
@@ -37,9 +38,9 @@ export async function buildApp() {
   await app.register(inviteRoutes, { prefix: '/invites' })
   await app.register(missionRoutes, { prefix: '/events' })
   await app.register(liveEventRoutes, { prefix: '/events' })
+  await app.register(submissionRoutes, { prefix: '/events' })
 
   // Future routes (added in subsequent steps):
-  // await app.register(submissionRoutes, { prefix: '/submissions' })
   // await app.register(exportRoutes, { prefix: '/export-jobs' })
 
   // Event state auto-transition scheduler + BullMQ mission worker
