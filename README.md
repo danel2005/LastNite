@@ -502,7 +502,7 @@ This is the emotional climax of the app.
 | Step 04 | `step/04-event-crud` | ✅ Done |
 | Step 05 | `step/05-mission-engine` | ✅ Done |
 | Step 06 | `step/06-live-event-api` | ✅ Done |
-| Step 07 | `step/07-media-upload` | Not started |
+| Step 07 | `step/07-media-upload` | ✅ Done |
 | Step 08 | `step/08-event-feed-api` | Not started |
 | Step 09 | `step/09-event-close-and-reveal` | Not started |
 | Step 10 | `step/10-recap-generation` | Not started |
