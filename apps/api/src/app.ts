@@ -11,6 +11,7 @@ import { eventRoutes, inviteRoutes } from './routes/events.js'
 import { missionRoutes } from './routes/missions.js'
 import { liveEventRoutes } from './routes/live.js'
 import { submissionRoutes } from './routes/submissions.js'
+import { feedRoutes } from './routes/feed.js'
 import { startEventScheduler } from './lib/event-scheduler.js'
 import { startMissionWorker, stopMissionWorker } from './jobs/mission-worker.js'
 
@@ -39,6 +40,7 @@ export async function buildApp() {
   await app.register(missionRoutes, { prefix: '/events' })
   await app.register(liveEventRoutes, { prefix: '/events' })
   await app.register(submissionRoutes, { prefix: '/events' })
+  await app.register(feedRoutes, { prefix: '/' })
 
   // Future routes (added in subsequent steps):
   // await app.register(exportRoutes, { prefix: '/export-jobs' })
