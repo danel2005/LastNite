@@ -1,12 +1,69 @@
-import { useEffect } from 'react'
+import { useEffect, Component, type ReactNode } from 'react'
 import { Stack } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { QueryClientProvider } from '@tanstack/react-query'
-import { StyleSheet } from 'react-native'
+import { StyleSheet, View, Text, TouchableOpacity } from 'react-native'
 import { queryClient } from '@/lib/query-client'
 import { useAuthStore } from '@/stores/auth-store'
 import { apiClient } from '@/lib/api-client'
+import { colors, spacing, typography } from '@/lib/design'
+
+// ─── Error Boundary ───────────────────────────────────────────────────────────
+
+interface EBState { hasError: boolean; error: Error | null }
+
+class AppErrorBoundary extends Component<{ children: ReactNode }, EBState> {
+  state: EBState = { hasError: false, error: null }
+
+  static getDerivedStateFromError(error: Error): EBState {
+    return { hasError: true, error }
+  }
+
+  handleReset = () => {
+    this.setState({ hasError: false, error: null })
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View style={ebSt.root}>
+          <Text style={ebSt.emoji}>⚠️</Text>
+          <Text style={ebSt.title}>Something went wrong</Text>
+          <Text style={ebSt.message} numberOfLines={4}>
+            {this.state.error?.message ?? 'An unexpected error occurred.'}
+          </Text>
+          <TouchableOpacity style={ebSt.btn} onPress={this.handleReset} activeOpacity={0.8}>
+            <Text style={ebSt.btnText}>Try again</Text>
+          </TouchableOpacity>
+        </View>
+      )
+    }
+    return this.props.children
+  }
+}
+
+const ebSt = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: colors.bg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.xl,
+    gap: spacing.md,
+  },
+  emoji: { fontSize: 48 },
+  title: { ...typography.heading2, color: colors.text, textAlign: 'center' },
+  message: { ...typography.bodySmall, color: colors.textSecondary, textAlign: 'center' },
+  btn: {
+    borderWidth: 1,
+    borderColor: colors.accent,
+    borderRadius: 12,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
+  },
+  btnText: { color: colors.accent, fontSize: 15, fontWeight: '700' },
+})
 
 export default function RootLayout() {
   const loadSession = useAuthStore((s) => s.loadSession)
@@ -34,10 +91,11 @@ export default function RootLayout() {
   }, [])
 
   return (
-    <GestureHandlerRootView style={styles.root}>
-      <QueryClientProvider client={queryClient}>
-        <StatusBar style="light" />
-        <Stack
+    <AppErrorBoundary>
+      <GestureHandlerRootView style={styles.root}>
+        <QueryClientProvider client={queryClient}>
+          <StatusBar style="light" />
+          <Stack
           screenOptions={{
             headerStyle: { backgroundColor: '#0A0A0A' },
             headerTintColor: '#FFFFFF',
@@ -45,11 +103,12 @@ export default function RootLayout() {
             contentStyle: { backgroundColor: '#0A0A0A' },
           }}
         >
-          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-          <Stack.Screen name="(app)" options={{ headerShown: false }} />
-        </Stack>
-      </QueryClientProvider>
-    </GestureHandlerRootView>
+            <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+            <Stack.Screen name="(app)" options={{ headerShown: false }} />
+          </Stack>
+        </QueryClientProvider>
+      </GestureHandlerRootView>
+    </AppErrorBoundary>
   )
 }
 
