@@ -53,6 +53,9 @@ export default function AppLayout() {
       <Stack.Screen name="events/[id]/reveal" options={{ title: 'The Reveal', headerShown: false }} />
       <Stack.Screen name="events/[id]/recap" options={{ title: 'Recap' }} />
       <Stack.Screen name="events/[id]/create-mission" options={{ title: 'New Mission', presentation: 'modal' }} />
+      <Stack.Screen name="events/[id]/camera" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
+      <Stack.Screen name="events/[id]/preview" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
+      <Stack.Screen name="events/[id]/export" options={{ title: 'Export & Share' }} />
       <Stack.Screen name="settings" options={{ title: 'Settings' }} />
     </Stack>
   )

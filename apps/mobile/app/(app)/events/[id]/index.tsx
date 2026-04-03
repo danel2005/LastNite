@@ -428,13 +428,10 @@ export default function LiveEventScreen() {
     (m) => m.status === 'active' && !m.hasSubmission,
   ) ?? data.myMissions[0] ?? null
 
-  function handleCompleteMission(_assignmentId: string) {
-    // Navigate to camera to capture submission
-    // For now, alert until Step 16 (camera) is built
-    Alert.alert(
-      'Complete Mission',
-      'Camera capture coming in the next update! For now, you can test submission via the API.',
-      [{ text: 'OK' }],
+  function handleCompleteMission(assignmentId: string) {
+    const mediaType = activeMission?.mission.mediaType ?? 'any'
+    router.push(
+      `/(app)/events/${id}/camera?assignmentId=${assignmentId}&mediaType=${mediaType}&eventId=${id}` as never,
     )
   }
 
