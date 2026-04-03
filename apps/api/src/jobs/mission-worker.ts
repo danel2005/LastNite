@@ -140,8 +140,9 @@ async function dispatchMissions(eventId: string, log: FastifyBaseLogger): Promis
     }
 
     // Create the assignment
+    let newAssignmentId: string | null = null
     try {
-      await prisma.missionAssignment.create({
+      const created = await prisma.missionAssignment.create({
         data: {
           missionInstanceId: instance.id,
           eventId,
@@ -151,11 +152,25 @@ async function dispatchMissions(eventId: string, log: FastifyBaseLogger): Promis
           expiresAt,
         },
       })
+      newAssignmentId = created.id
       assigned++
     } catch (err: unknown) {
       // Unique constraint violation = user already has this instance; skip silently
       if (isUniqueConstraintError(err)) continue
       throw err
+    }
+
+    // Notify user of new mission (fire-and-forget)
+    if (newAssignmentId) {
+      const def = await prisma.missionDefinition.findUnique({ where: { id: chosen.id }, select: { title: true } })
+      const { enqueueNotification } = await import('./notification-worker.js')
+      enqueueNotification({
+        type: 'mission_assigned',
+        userId,
+        eventId,
+        payload: { missionTitle: chosen.defaultIsSecret ? 'A secret mission...' : (def?.title ?? 'New mission'), eventId, assignmentId: newAssignmentId },
+        idempotencyKey: `mission_assigned-${newAssignmentId}`,
+      }).catch(() => { /* notifications are best-effort */ })
     }
   }
 
@@ -254,6 +269,24 @@ async function assignFinaleMissions(eventId: string, log: FastifyBaseLogger): Pr
   }
 
   log.info({ eventId, count }, 'mission-worker: finale missions assigned')
+
+  if (count > 0) {
+    // Notify all newly-assigned participants
+    const { enqueueNotification } = await import('./notification-worker.js')
+    await Promise.all(
+      event.participants
+        .filter((p) => !alreadyAssigned.has(p.userId))
+        .map((p) =>
+          enqueueNotification({
+            type: 'group_mission_live',
+            userId: p.userId,
+            eventId,
+            payload: { missionTitle: finaleDef.title, eventId },
+            idempotencyKey: `group_mission_live-${eventId}-finale-${p.userId}`,
+          }).catch(() => {}),
+        ),
+    )
+  }
 }
 
 // ─── Worker bootstrap ────────────────────────────────────────────────────────

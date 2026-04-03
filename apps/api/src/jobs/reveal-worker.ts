@@ -265,6 +265,20 @@ async function computeReveal(eventId: string, log: FastifyBaseLogger): Promise<v
   const recapQueue = getRecapQueue()
   await recapQueue.add('compute-recap', { eventId }, { jobId: `recap-${eventId}` })
 
+  // Notify all participants that the reveal is ready
+  const { enqueueNotification } = await import('./notification-worker.js')
+  await Promise.all(
+    participants.map((p) =>
+      enqueueNotification({
+        type: 'reveal_ready',
+        userId: p.userId,
+        eventId,
+        payload: { eventTitle: event.title, eventId },
+        idempotencyKey: `reveal_ready-${eventId}-${p.userId}`,
+      }),
+    ),
+  )
+
   log.info({ eventId, missions: revealWithUrls.length, awards: awards.length }, 'reveal-worker: computation complete')
 }
 
