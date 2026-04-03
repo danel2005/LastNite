@@ -15,4 +15,8 @@ config.resolver.nodeModulesPaths = [
   path.resolve(workspaceRoot, 'node_modules'),
 ]
 
+// Required for Expo Router + monorepo: enables package.json "exports" field
+// so that expo-router/entry resolves correctly (especially on web).
+config.resolver.unstable_enablePackageExports = true
+
 module.exports = config
