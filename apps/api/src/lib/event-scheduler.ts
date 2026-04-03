@@ -1,6 +1,7 @@
 import type { FastifyBaseLogger } from 'fastify'
 import { prisma } from '@lastnite/db'
 import type { EventState } from '@prisma/client'
+import { scheduleEventMissions } from '../jobs/mission-worker.js'
 
 const TICK_MS = 60_000 // run every 60 seconds
 
@@ -20,16 +21,21 @@ async function tick(log: FastifyBaseLogger) {
 
   try {
     // scheduled → live
-    const toGo = await prisma.event.updateMany({
-      where: {
-        state: 'scheduled' as EventState,
-        startsAt: { lte: now },
-        deletedAt: null,
-      },
-      data: { state: 'live' },
+    const nowLiveEvents = await prisma.event.findMany({
+      where: { state: 'scheduled' as EventState, startsAt: { lte: now }, deletedAt: null },
+      select: { id: true, endsAt: true },
     })
-    if (toGo.count > 0) log.info({ count: toGo.count }, 'event-scheduler: scheduled → live')
-
+    if (nowLiveEvents.length > 0) {
+      await prisma.event.updateMany({
+        where: { id: { in: nowLiveEvents.map((e) => e.id) } },
+        data: { state: 'live' },
+      })
+      log.info({ count: nowLiveEvents.length }, 'event-scheduler: scheduled → live')
+      // Kick off mission dispatch for each newly-live event
+      for (const e of nowLiveEvents) {
+        await scheduleEventMissions(e.id, e.endsAt, log)
+      }
+    }
     // live → ending  (5 min before end)
     const toEnding = await prisma.event.updateMany({
       where: {
