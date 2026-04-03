@@ -31,11 +31,15 @@ export default function VerifyScreen() {
     }
     setLoading(true)
     try {
-      const res = await apiClient.post('/auth/verify-otp', { phone, token: otp })
-      const data = res.data as { access_token: string; user: User & { createdAt?: string; updatedAt?: string }; profile: Profile | null }
+      const res = await apiClient.post('/auth/verify-otp', { phone, token: otp, type: 'sms' })
+      const data = res.data as {
+        session: { accessToken: string }
+        user: { id: string; phone: string | null; email: string | null }
+        profile: Profile | null
+      }
       const now = new Date().toISOString()
-      const user: User = { ...data.user, createdAt: data.user.createdAt ?? now, updatedAt: data.user.updatedAt ?? now }
-      await setSession(user, data.profile, data.access_token)
+      const user: User = { id: data.user.id, phone: data.user.phone ?? null, email: data.user.email ?? null, createdAt: now, updatedAt: now }
+      await setSession(user, data.profile, data.session.accessToken)
 
       if (!data.profile?.displayName) {
         router.replace('/(auth)/profile-setup')
