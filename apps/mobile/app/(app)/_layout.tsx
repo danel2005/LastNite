@@ -46,10 +46,13 @@ export default function AppLayout() {
     <Stack screenOptions={{ contentStyle: { backgroundColor: '#0A0A0A' } }}>
       <Stack.Screen name="index" options={{ title: 'LastNite', headerLargeTitle: true }} />
       <Stack.Screen name="events/create" options={{ title: 'New Event', presentation: 'modal' }} />
+      <Stack.Screen name="events/join" options={{ title: 'Join Event', presentation: 'modal' }} />
       <Stack.Screen name="events/[id]/index" options={{ title: '' }} />
+      <Stack.Screen name="events/[id]/lobby" options={{ title: 'Waiting Room' }} />
       <Stack.Screen name="events/[id]/feed" options={{ title: 'Feed' }} />
       <Stack.Screen name="events/[id]/reveal" options={{ title: 'The Reveal', headerShown: false }} />
       <Stack.Screen name="events/[id]/recap" options={{ title: 'Recap' }} />
+      <Stack.Screen name="events/[id]/create-mission" options={{ title: 'New Mission', presentation: 'modal' }} />
       <Stack.Screen name="settings" options={{ title: 'Settings' }} />
     </Stack>
   )
