@@ -246,4 +246,65 @@ export async function feedRoutes(app: FastifyInstance) {
       })),
     })
   })
+
+  // ── POST /submissions/:submissionId/report ────────────────────────────────
+  // Report a submission for moderation. Any event participant can report.
+  // Normalises category strings from the mobile client.
+  app.post('/submissions/:submissionId/report', async (request, reply) => {
+    const userId = request.user.sub
+    const { submissionId } = request.params as { submissionId: string }
+
+    const CATEGORY_MAP: Record<string, string> = {
+      inappropriate: 'inappropriate',
+      Inappropriate: 'inappropriate',
+      harmful: 'harmful',
+      Harmful: 'harmful',
+      spam: 'spam',
+      Spam: 'spam',
+      other: 'other',
+      Other: 'other',
+    }
+
+    const schema = z.object({
+      category: z.string().min(1),
+      description: z.string().max(500).optional(),
+    })
+
+    const body = schema.safeParse(request.body)
+    if (!body.success) {
+      return reply.status(400).send({ error: 'Validation error', issues: body.error.issues })
+    }
+
+    const rawCategory = CATEGORY_MAP[body.data.category]
+    if (!rawCategory) {
+      return reply.status(400).send({ error: `Unknown category: ${body.data.category}` })
+    }
+
+    const submission = await prisma.submission.findUnique({ where: { id: submissionId } })
+    if (!submission) return reply.status(404).send({ error: 'Submission not found' })
+
+    // Must be a participant in the event
+    const participant = await prisma.participant.findUnique({
+      where: { eventId_userId: { eventId: submission.eventId, userId } },
+    })
+    if (!participant || participant.removedAt) {
+      return reply.status(403).send({ error: 'Forbidden' })
+    }
+
+    // Get the first asset for this submission to link the report
+    const asset = await prisma.submissionAsset.findFirst({
+      where: { submissionId },
+    })
+
+    await prisma.moderationReport.create({
+      data: {
+        reportedByUserId: userId,
+        submissionAssetId: asset?.id ?? null,
+        category: rawCategory as 'inappropriate' | 'harmful' | 'spam' | 'other',
+        description: body.data.description ?? null,
+      },
+    })
+
+    return reply.status(201).send({ ok: true })
+  })
 }
