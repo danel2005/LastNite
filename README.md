@@ -509,7 +509,7 @@ This is the emotional climax of the app.
 | Step 11 | `step/11-export-system` | ✅ Done |
 | Step 12 | `step/12-notifications` | ✅ Done |
 | Step 13 | `step/13-mobile-foundation` | ✅ Done |
-| Step 14 | `step/14-mobile-event-screens` | Not started |
+| Step 14 | `step/14-mobile-event-screens` | ✅ Done |
 | Step 15 | `step/15-mobile-live-event` | Not started |
 | Step 16 | `step/16-mobile-camera` | Not started |
 | Step 17 | `step/17-mobile-feed` | Not started |
