@@ -8,6 +8,7 @@
   "scripts": {
     "build": "turbo build",
     "dev": "turbo dev",
+    "mobile": "cd apps/mobile && npx expo start",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\" --ignore-path .gitignore",
@@ -29,5 +30,8 @@
     "trailingComma": "all",
     "printWidth": 100,
     "tabWidth": 2
+  },
+  "dependencies": {
+    "react-native-web": "~0.19.10"
   }
 }
