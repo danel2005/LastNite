@@ -32,6 +32,10 @@ enum EventTemplate {
   bachelor_bachelorette
   trip
   festival
+  trek
+  ski
+  wedding
+  costume_party
 }
 
 enum MissionCategory {
