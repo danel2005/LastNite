@@ -505,7 +505,7 @@ This is the emotional climax of the app.
 | Step 07 | `step/07-media-upload` | ✅ Done |
 | Step 08 | `step/08-event-feed-api` | ✅ Done |
 | Step 09 | `step/09-event-close-and-reveal` | ✅ Done |
-| Step 10 | `step/10-recap-generation` | Not started |
+| Step 10 | `step/10-recap-generation` | ✅ Done |
 | Step 11 | `step/11-export-system` | Not started |
 | Step 12 | `step/12-notifications` | Not started |
 | Step 13 | `step/13-mobile-foundation` | Not started |
