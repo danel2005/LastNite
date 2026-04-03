@@ -12,8 +12,10 @@ import { missionRoutes } from './routes/missions.js'
 import { liveEventRoutes } from './routes/live.js'
 import { submissionRoutes } from './routes/submissions.js'
 import { feedRoutes } from './routes/feed.js'
+import { revealRoutes } from './routes/reveal.js'
 import { startEventScheduler } from './lib/event-scheduler.js'
 import { startMissionWorker, stopMissionWorker } from './jobs/mission-worker.js'
+import { startRevealWorker, stopRevealWorker } from './jobs/reveal-worker.js'
 
 export async function buildApp() {
   const app = Fastify({
@@ -41,6 +43,7 @@ export async function buildApp() {
   await app.register(liveEventRoutes, { prefix: '/events' })
   await app.register(submissionRoutes, { prefix: '/events' })
   await app.register(feedRoutes, { prefix: '/' })
+  await app.register(revealRoutes, { prefix: '/events' })
 
   // Future routes (added in subsequent steps):
   // await app.register(exportRoutes, { prefix: '/export-jobs' })
@@ -48,9 +51,11 @@ export async function buildApp() {
   // Event state auto-transition scheduler + BullMQ mission worker
   const schedulerTimer = startEventScheduler(app.log)
   startMissionWorker(app.log)
+  startRevealWorker(app.log)
   app.addHook('onClose', async () => {
     clearInterval(schedulerTimer)
     await stopMissionWorker()
+    await stopRevealWorker()
   })
 
   return app
