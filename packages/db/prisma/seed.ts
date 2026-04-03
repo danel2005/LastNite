@@ -311,6 +311,66 @@ const MISSIONS: MissionDef[] = [
     description: 'Everyone: take a selfie right now. No posing. Just real.',
     category: 'everyone_now', mediaType: 'photo', intensity: 1, isSocial: false, defaultIsSecret: false,
   },
+  {
+    title: 'Point at something',
+    description: 'Everyone: point at the most interesting thing around you right now. Photograph it.',
+    category: 'everyone_now', mediaType: 'photo', intensity: 1, isSocial: false, defaultIsSecret: false,
+  },
+
+  // ── EXTRA SELFIE ──────────────────────────────────────────────────────────
+  {
+    title: 'The awkward selfie',
+    description: 'Take the most awkward, unflattering selfie you can manage.',
+    category: 'selfie', mediaType: 'photo', intensity: 3, isSocial: false, defaultIsSecret: false,
+  },
+  {
+    title: 'Invisible selfie',
+    description: 'Take a selfie where you pretend you\'re invisible. Do NOT look at the camera.',
+    category: 'selfie', mediaType: 'photo', intensity: 2, isSocial: false, defaultIsSecret: false,
+  },
+
+  // ── EXTRA FOOD & DRINK ────────────────────────────────────────────────────
+  {
+    title: 'Plate presentation',
+    description: 'Photograph whatever you\'re eating/drinking as if it\'s in a Michelin-star restaurant.',
+    category: 'food_drink', mediaType: 'photo', intensity: 1, isSocial: false, defaultIsSecret: false,
+  },
+  {
+    title: 'Order something unusual',
+    description: 'Order or grab something you\'ve never tried before and film your first reaction.',
+    category: 'food_drink', mediaType: 'video', intensity: 2, isSocial: false, defaultIsSecret: false,
+    minDurationMs: 3000, maxDurationMs: 20000,
+  },
+
+  // ── EXTRA ENVIRONMENT (for trek/ski/outdoor events) ───────────────────────
+  {
+    title: 'Horizon shot',
+    description: 'Find a clear line between ground and sky. Make it beautiful.',
+    category: 'environment', mediaType: 'photo', intensity: 1, isSocial: false, defaultIsSecret: false,
+  },
+  {
+    title: 'Nature close-up',
+    description: 'Get extremely close to something natural — bark, rock, snow, leaf — and photograph the texture.',
+    category: 'environment', mediaType: 'photo', intensity: 1, isSocial: false, defaultIsSecret: false,
+  },
+  {
+    title: 'Golden moment',
+    description: 'Find and photograph the best light you can see right now.',
+    category: 'environment', mediaType: 'photo', intensity: 1, isSocial: false, defaultIsSecret: false,
+  },
+
+  // ── EXTRA DUO ─────────────────────────────────────────────────────────────
+  {
+    title: 'Back to back',
+    description: 'Stand back-to-back with someone and photograph from above.',
+    category: 'duo', mediaType: 'photo', intensity: 2, isSocial: false, defaultIsSecret: false,
+  },
+  {
+    title: 'Synchronized move',
+    description: 'Convince one person to do the exact same move as you at the same time. Film it.',
+    category: 'duo', mediaType: 'video', intensity: 3, isSocial: false, defaultIsSecret: false,
+    minDurationMs: 3000, maxDurationMs: 15000,
+  },
 
   // ── FINALE — assigned to all participants near event end ──────────────────
   {
@@ -380,9 +440,9 @@ const PACKS: PackDef[] = [
     maxIntensity: 2,
   },
   {
-    name: 'Social Pack',
+    name: 'Public Social Pack',
     description: 'Includes public interaction missions. Requires allowPublicSocialMissions on the event.',
-    slug: 'social',
+    slug: 'public-social',
     categories: ['public_social', 'selfie', 'duo', 'chaos'],
     maxIntensity: 4,
   },
@@ -398,6 +458,13 @@ const PACKS: PackDef[] = [
     description: 'For vacations, road trips, and travel groups. Environment and memory focused.',
     slug: 'trip',
     categories: ['environment', 'selfie', 'group_selfie', 'object_hunt', 'mood_vibe', 'finale'],
+    maxIntensity: 3,
+  },
+  {
+    name: 'Adventure Pack',
+    description: 'For treks, ski trips, and outdoor adventures. Environment-heavy, captures scenery and moments.',
+    slug: 'adventure',
+    categories: ['environment', 'selfie', 'group_selfie', 'object_hunt', 'duo', 'mood_vibe'],
     maxIntensity: 3,
   },
   {
