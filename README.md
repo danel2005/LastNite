@@ -513,7 +513,7 @@ This is the emotional climax of the app.
 | Step 15 | `step/15-mobile-live-event` | ✅ Done |
 | Step 16 | `step/16-mobile-camera` | ✅ Done |
 | Step 17 | `step/17-mobile-feed` | ✅ Done |
-| Step 18 | `step/18-mobile-reveal-and-recap` | Not started |
+| Step 18 | `step/18-mobile-reveal-and-recap` | ✅ Done |
 | Step 19 | `step/19-mobile-export` | Not started |
 | Step 20 | `step/20-safety-and-polish` | Not started |
 
