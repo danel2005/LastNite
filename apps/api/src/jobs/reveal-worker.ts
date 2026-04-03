@@ -260,6 +260,11 @@ async function computeReveal(eventId: string, log: FastifyBaseLogger): Promise<v
     data: { state: 'completed' },
   })
 
+  // Kick off recap generation immediately after reveal is done
+  const { getRecapQueue } = await import('./recap-worker.js')
+  const recapQueue = getRecapQueue()
+  await recapQueue.add('compute-recap', { eventId }, { jobId: `recap-${eventId}` })
+
   log.info({ eventId, missions: revealWithUrls.length, awards: awards.length }, 'reveal-worker: computation complete')
 }
 

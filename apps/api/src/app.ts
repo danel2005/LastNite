@@ -13,9 +13,11 @@ import { liveEventRoutes } from './routes/live.js'
 import { submissionRoutes } from './routes/submissions.js'
 import { feedRoutes } from './routes/feed.js'
 import { revealRoutes } from './routes/reveal.js'
+import { recapRoutes } from './routes/recap.js'
 import { startEventScheduler } from './lib/event-scheduler.js'
 import { startMissionWorker, stopMissionWorker } from './jobs/mission-worker.js'
 import { startRevealWorker, stopRevealWorker } from './jobs/reveal-worker.js'
+import { startRecapWorker, stopRecapWorker } from './jobs/recap-worker.js'
 
 export async function buildApp() {
   const app = Fastify({
@@ -44,6 +46,7 @@ export async function buildApp() {
   await app.register(submissionRoutes, { prefix: '/events' })
   await app.register(feedRoutes, { prefix: '/' })
   await app.register(revealRoutes, { prefix: '/events' })
+  await app.register(recapRoutes, { prefix: '/events' })
 
   // Future routes (added in subsequent steps):
   // await app.register(exportRoutes, { prefix: '/export-jobs' })
@@ -52,10 +55,12 @@ export async function buildApp() {
   const schedulerTimer = startEventScheduler(app.log)
   startMissionWorker(app.log)
   startRevealWorker(app.log)
+  startRecapWorker(app.log)
   app.addHook('onClose', async () => {
     clearInterval(schedulerTimer)
     await stopMissionWorker()
     await stopRevealWorker()
+    await stopRecapWorker()
   })
 
   return app
