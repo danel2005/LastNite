@@ -20,6 +20,7 @@ import { startMissionWorker, stopMissionWorker } from './jobs/mission-worker.js'
 import { startRevealWorker, stopRevealWorker } from './jobs/reveal-worker.js'
 import { startRecapWorker, stopRecapWorker } from './jobs/recap-worker.js'
 import { startExportWorker, stopExportWorker } from './jobs/export-worker.js'
+import { startNotificationWorker, stopNotificationWorker } from './jobs/notification-worker.js'
 
 export async function buildApp() {
   const app = Fastify({
@@ -58,12 +59,14 @@ export async function buildApp() {
   startRevealWorker(app.log)
   startRecapWorker(app.log)
   startExportWorker(app.log)
+  startNotificationWorker(app.log)
   app.addHook('onClose', async () => {
     clearInterval(schedulerTimer)
     await stopMissionWorker()
     await stopRevealWorker()
     await stopRecapWorker()
     await stopExportWorker()
+    await stopNotificationWorker()
   })
 
   return app

@@ -64,7 +64,7 @@ async function processPhotoPack(
     }),
   )
 
-  await prisma.exportJob.update({
+  const updatedJob = await prisma.exportJob.update({
     where: { id: exportJobId },
     data: {
       status: 'ready',
@@ -72,6 +72,16 @@ async function processPhotoPack(
       resultPayload: { type: 'photo_pack', photos: urls.filter((u) => u.url !== null) },
     },
   })
+
+  // Notify requester
+  const { enqueueNotification } = await import('./notification-worker.js')
+  await enqueueNotification({
+    type: 'export_ready',
+    userId: updatedJob.requestedByUserId,
+    eventId: updatedJob.eventId,
+    payload: { exportJobId, eventId: updatedJob.eventId },
+    idempotencyKey: `export_ready-${exportJobId}`,
+  }).catch(() => {})
 
   log.info({ exportJobId, count: urls.length }, 'export-worker: photo_pack complete')
 }
@@ -132,7 +142,7 @@ async function processHighlightReel(
     }),
   )
 
-  await prisma.exportJob.update({
+  const updatedReelJob = await prisma.exportJob.update({
     where: { id: exportJobId },
     data: {
       status: 'ready',
@@ -140,6 +150,16 @@ async function processHighlightReel(
       resultPayload: { type: 'highlight_reel', clips: clips.filter((c) => c.url !== null) },
     },
   })
+
+  // Notify requester
+  const { enqueueNotification } = await import('./notification-worker.js')
+  await enqueueNotification({
+    type: 'export_ready',
+    userId: updatedReelJob.requestedByUserId,
+    eventId: updatedReelJob.eventId,
+    payload: { exportJobId, eventId: updatedReelJob.eventId },
+    idempotencyKey: `export_ready-${exportJobId}`,
+  }).catch(() => {})
 
   log.info({ exportJobId, count: clips.length }, 'export-worker: highlight_reel complete')
 }
