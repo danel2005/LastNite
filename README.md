@@ -515,7 +515,7 @@ This is the emotional climax of the app.
 | Step 17 | `step/17-mobile-feed` | ✅ Done |
 | Step 18 | `step/18-mobile-reveal-and-recap` | ✅ Done |
 | Step 19 | `step/19-mobile-export` | ✅ Done |
-| Step 20 | `step/20-safety-and-polish` | Not started |
+| Step 20 | `step/20-safety-and-polish` | ✅ Done |
 
 ---
 
