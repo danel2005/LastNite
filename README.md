@@ -511,7 +511,7 @@ This is the emotional climax of the app.
 | Step 13 | `step/13-mobile-foundation` | ✅ Done |
 | Step 14 | `step/14-mobile-event-screens` | ✅ Done |
 | Step 15 | `step/15-mobile-live-event` | ✅ Done |
-| Step 16 | `step/16-mobile-camera` | Not started |
+| Step 16 | `step/16-mobile-camera` | ✅ Done |
 | Step 17 | `step/17-mobile-feed` | Not started |
 | Step 18 | `step/18-mobile-reveal-and-recap` | Not started |
 | Step 19 | `step/19-mobile-export` | Not started |
