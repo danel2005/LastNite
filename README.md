@@ -506,7 +506,7 @@ This is the emotional climax of the app.
 | Step 08 | `step/08-event-feed-api` | ✅ Done |
 | Step 09 | `step/09-event-close-and-reveal` | ✅ Done |
 | Step 10 | `step/10-recap-generation` | ✅ Done |
-| Step 11 | `step/11-export-system` | Not started |
+| Step 11 | `step/11-export-system` | ✅ Done |
 | Step 12 | `step/12-notifications` | Not started |
 | Step 13 | `step/13-mobile-foundation` | Not started |
 | Step 14 | `step/14-mobile-event-screens` | Not started |
