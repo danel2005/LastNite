@@ -500,7 +500,7 @@ This is the emotional climax of the app.
 | Step 02 | `step/02-database-schema` | ✅ Done |
 | Step 03 | `step/03-backend-auth` | ✅ Done |
 | Step 04 | `step/04-event-crud` | ✅ Done |
-| Step 05 | `step/05-mission-engine` | Not started |
+| Step 05 | `step/05-mission-engine` | ✅ Done |
 | Step 06 | `step/06-live-event-api` | Not started |
 | Step 07 | `step/07-media-upload` | Not started |
 | Step 08 | `step/08-event-feed-api` | Not started |
