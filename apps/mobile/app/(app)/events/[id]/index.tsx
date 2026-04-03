@@ -369,6 +369,28 @@ const hostStyles = StyleSheet.create({
   disabled: { opacity: 0.5 },
 })
 
+// ─── Offline Banner ───────────────────────────────────────────────────────────
+
+function OfflineBanner() {
+  return (
+    <View style={offSt.banner}>
+      <Text style={offSt.text}>📡 No connection — waiting to reconnect...</Text>
+    </View>
+  )
+}
+
+const offSt = StyleSheet.create({
+  banner: {
+    backgroundColor: colors.bgElevated,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    alignItems: 'center',
+  },
+  text: { ...typography.label, color: colors.textSecondary },
+})
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function LiveEventScreen() {
@@ -377,7 +399,7 @@ export default function LiveEventScreen() {
   const qc = useQueryClient()
   const pollIntervalRef = useRef(30_000)
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, isPending } = useQuery({
     queryKey: ['live', id],
     queryFn: () => fetchLiveEvent(id!),
     enabled: !!id,
@@ -404,7 +426,7 @@ export default function LiveEventScreen() {
 
   const eventTimeRemaining = useCountdown(data?.event.timeRemainingMs ?? 0)
 
-  if (isLoading) {
+  if (isLoading || isPending) {
     return (
       <View style={s.centered}>
         <ActivityIndicator color={colors.accent} size="large" />
@@ -412,7 +434,7 @@ export default function LiveEventScreen() {
     )
   }
 
-  if (isError || !data) {
+  if (isError && !data) {
     return (
       <View style={s.centered}>
         <Text style={s.errorText}>Failed to load event.</Text>
@@ -436,8 +458,11 @@ export default function LiveEventScreen() {
   }
 
   return (
-    <ScrollView style={s.root} contentContainerStyle={s.content}>
-      {/* Event title + time remaining */}
+    <>
+      {/* Offline banner — shown when we have cached data but fetch is failing */}
+      {isError && data && <OfflineBanner />}
+      <ScrollView style={s.root} contentContainerStyle={s.content}>
+        {/* Event title + time remaining */}
       <View style={s.topBar}>
         <View style={s.topBarLeft}>
           <Text style={s.eventTitle} numberOfLines={1}>{data.event.title}</Text>
@@ -497,9 +522,10 @@ export default function LiveEventScreen() {
         <Text style={s.customMissionText}>+ Create custom mission</Text>
       </TouchableOpacity>
 
-      {/* Host panel */}
-      {data.hostData && <HostPanel data={data.hostData} eventId={id!} />}
-    </ScrollView>
+        {/* Host panel */}
+        {data.hostData && <HostPanel data={data.hostData} eventId={id!} />}
+      </ScrollView>
+    </>
   )
 }
 
