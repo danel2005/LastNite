@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import {
   View,
   Text,
@@ -41,16 +41,75 @@ async function fetchParticipants(id: string): Promise<ApiParticipant[]> {
 
 // ─── Countdown ────────────────────────────────────────────────────────────────
 
-function formatCountdown(ms: number): string {
-  if (ms <= 0) return 'Starting now!'
+function useCountdown(targetMs: number) {
+  const [now, setNow] = useState(Date.now())
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [])
+  return Math.max(0, targetMs - now)
+}
+
+function pad(n: number) { return n.toString().padStart(2, '0') }
+
+function CountdownDisplay({ startsAt }: { startsAt: string }) {
+  const ms = useCountdown(new Date(startsAt).getTime())
+  if (ms === 0) return <Text style={styles.countdown}>Starting now!</Text>
+
   const totalSec = Math.floor(ms / 1000)
-  const days = Math.floor(totalSec / 86400)
+  const days  = Math.floor(totalSec / 86400)
   const hours = Math.floor((totalSec % 86400) / 3600)
-  const mins = Math.floor((totalSec % 3600) / 60)
-  const secs = totalSec % 60
-  if (days > 0) return `${days}d ${hours}h`
-  if (hours > 0) return `${hours}h ${mins}m`
-  return `${mins}:${secs.toString().padStart(2, '0')}`
+  const mins  = Math.floor((totalSec % 3600) / 60)
+  const secs  = totalSec % 60
+
+  if (days > 0) {
+    return (
+      <View style={styles.countdownRow}>
+        <View style={styles.countdownUnit}>
+          <Text style={styles.countdown}>{days}</Text>
+          <Text style={styles.countdownUnitLabel}>days</Text>
+        </View>
+        <Text style={styles.countdownColon}>:</Text>
+        <View style={styles.countdownUnit}>
+          <Text style={styles.countdown}>{pad(hours)}</Text>
+          <Text style={styles.countdownUnitLabel}>hours</Text>
+        </View>
+        <Text style={styles.countdownColon}>:</Text>
+        <View style={styles.countdownUnit}>
+          <Text style={styles.countdown}>{pad(mins)}</Text>
+          <Text style={styles.countdownUnitLabel}>min</Text>
+        </View>
+        <Text style={styles.countdownColon}>:</Text>
+        <View style={styles.countdownUnit}>
+          <Text style={styles.countdown}>{pad(secs)}</Text>
+          <Text style={styles.countdownUnitLabel}>sec</Text>
+        </View>
+      </View>
+    )
+  }
+
+  return (
+    <View style={styles.countdownRow}>
+      {hours > 0 && (
+        <>
+          <View style={styles.countdownUnit}>
+            <Text style={styles.countdown}>{pad(hours)}</Text>
+            <Text style={styles.countdownUnitLabel}>hours</Text>
+          </View>
+          <Text style={styles.countdownColon}>:</Text>
+        </>
+      )}
+      <View style={styles.countdownUnit}>
+        <Text style={styles.countdown}>{pad(mins)}</Text>
+        <Text style={styles.countdownUnitLabel}>min</Text>
+      </View>
+      <Text style={styles.countdownColon}>:</Text>
+      <View style={styles.countdownUnit}>
+        <Text style={styles.countdown}>{pad(secs)}</Text>
+        <Text style={styles.countdownUnitLabel}>sec</Text>
+      </View>
+    </View>
+  )
 }
 
 // ─── ParticipantRow ───────────────────────────────────────────────────────────
@@ -124,8 +183,7 @@ export default function LobbyScreen() {
     )
   }
 
-  const now = Date.now()
-  const startsInMs = new Date(event.startsAt).getTime() - now
+  const startsInMs = new Date(event.startsAt).getTime() - Date.now()
 
   return (
     <View style={styles.root}>
@@ -139,14 +197,8 @@ export default function LobbyScreen() {
 
             {/* Countdown */}
             <View style={styles.countdownCard}>
-              {startsInMs > 0 ? (
-                <>
-                  <Text style={styles.countdownLabel}>Starts in</Text>
-                  <Text style={styles.countdown}>{formatCountdown(startsInMs)}</Text>
-                </>
-              ) : (
-                <Text style={styles.countdown}>Starting soon...</Text>
-              )}
+              <Text style={styles.countdownLabel}>Starts in</Text>
+              <CountdownDisplay startsAt={event.startsAt} />
             </View>
 
             {/* Invite code */}
@@ -175,29 +227,29 @@ export default function LobbyScreen() {
         contentContainerStyle={styles.listContent}
         ListFooterComponent={
           <View style={styles.footer}>
-            {isHost && (
-              <>
-                <TouchableOpacity
-                  style={styles.createMissionButton}
-                  onPress={() => router.push(`/(app)/events/${id}/create-mission`)}
-                >
-                  <Text style={styles.createMissionText}>+ Add custom mission</Text>
-                </TouchableOpacity>
+            {/* All participants can add missions before the event starts */}
+            <TouchableOpacity
+              style={styles.createMissionButton}
+              onPress={() => router.push(`/(app)/events/${id}/create-mission`)}
+            >
+              <Text style={styles.createMissionText}>+ Add custom mission</Text>
+            </TouchableOpacity>
+            <Text style={styles.missionNote}>
+              Anyone can add missions now. Editing is locked once the event starts.
+            </Text>
 
-                {startsInMs <= 0 && (
-                  <TouchableOpacity
-                    style={[styles.startButton, startNowMutation.isPending && styles.buttonDisabled]}
-                    onPress={() => startNowMutation.mutate()}
-                    disabled={startNowMutation.isPending}
-                  >
-                    {startNowMutation.isPending ? (
-                      <ActivityIndicator color={colors.bg} />
-                    ) : (
-                      <Text style={styles.startText}>Start Event Now</Text>
-                    )}
-                  </TouchableOpacity>
+            {isHost && startsInMs <= 0 && (
+              <TouchableOpacity
+                style={[styles.startButton, startNowMutation.isPending && styles.buttonDisabled]}
+                onPress={() => startNowMutation.mutate()}
+                disabled={startNowMutation.isPending}
+              >
+                {startNowMutation.isPending ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.startText}>Start Event Now</Text>
                 )}
-              </>
+              </TouchableOpacity>
             )}
 
             {!isHost && (
@@ -227,8 +279,12 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
     ...shadows.card,
   },
-  countdownLabel: { ...typography.label, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 1 },
+  countdownLabel: { ...typography.label, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 1, marginBottom: spacing.md },
+  countdownRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 2 },
+  countdownUnit: { alignItems: 'center', minWidth: 52 },
   countdown: { fontSize: 48, fontWeight: '900', color: colors.accent, letterSpacing: -2 },
+  countdownColon: { fontSize: 40, fontWeight: '900', color: colors.accent, marginBottom: 14, paddingHorizontal: 2 },
+  countdownUnitLabel: { ...typography.label, color: colors.textSecondary, fontSize: 10, letterSpacing: 1, marginTop: 2 },
   inviteRow: {
     backgroundColor: colors.bgCard,
     borderRadius: borderRadius.lg,
@@ -289,4 +345,5 @@ const styles = StyleSheet.create({
   startText: { color: colors.bg, fontSize: 16, fontWeight: '700' },
   buttonDisabled: { opacity: 0.5 },
   waitingHint: { ...typography.body, color: colors.textTertiary, textAlign: 'center', marginTop: spacing.md },
+  missionNote: { ...typography.bodySmall, color: colors.textTertiary, textAlign: 'center', marginTop: 4 },
 })

@@ -94,8 +94,21 @@ export default function HomeScreen() {
     refetchInterval: 30_000,
   })
 
-  const upcoming = events?.filter((e) => ['draft', 'scheduled', 'live', 'ending'].includes(e.state)) ?? []
-  const past = events?.filter((e) => ['completed', 'archived', 'cancelled', 'processing'].includes(e.state)) ?? []
+  const now = Date.now()
+  // An event is "upcoming/active" when its state is active OR it hasn't ended yet.
+  // Events that are "scheduled/draft" but whose end time is already past are treated as past.
+  const upcoming = events?.filter((e) => {
+    if (['live', 'ending'].includes(e.state)) return true
+    if (['completed', 'archived', 'cancelled', 'processing'].includes(e.state)) return false
+    // draft / scheduled: only show as upcoming if endsAt is in the future
+    return new Date(e.endsAt).getTime() > now
+  }) ?? []
+  const past = events?.filter((e) => {
+    if (['completed', 'archived', 'cancelled', 'processing'].includes(e.state)) return true
+    if (['live', 'ending'].includes(e.state)) return false
+    // draft / scheduled past their end time
+    return new Date(e.endsAt).getTime() <= now
+  }) ?? []
 
   return (
     <View style={styles.root}>
@@ -130,7 +143,10 @@ export default function HomeScreen() {
         </View>
       ) : (
         <FlatList
-          data={[...upcoming, ...past]}
+          data={[
+            ...upcoming.sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()),
+            ...past.sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime()),
+          ]}
           keyExtractor={(item) => item.id}
           refreshControl={
             <RefreshControl

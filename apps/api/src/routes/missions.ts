@@ -43,9 +43,12 @@ export async function missionRoutes(app: FastifyInstance) {
       return reply.status(403).send({ error: 'Custom missions are disabled for this event' })
     }
 
-    // Can only create custom missions before or during the event (not after it's completed)
+    // Missions are locked once the event starts — can only be added before it goes live
+    if (event.state === 'live' || event.state === 'ending') {
+      return reply.status(409).send({ error: 'Mission creation is locked once the event has started.' })
+    }
     if (event.state === 'completed' || event.state === 'archived' || event.state === 'cancelled') {
-      return reply.status(409).send({ error: 'Cannot create missions for a finished event' })
+      return reply.status(409).send({ error: 'Cannot create missions for a finished event.' })
     }
 
     const { title, description, mediaType, isSecret, targetUserId, assignToAll } = body.data

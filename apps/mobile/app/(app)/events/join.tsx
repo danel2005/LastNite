@@ -21,7 +21,7 @@ export default function JoinScreen() {
   const [loading, setLoading] = useState(false)
 
   async function handleJoin() {
-    const cleaned = code.toUpperCase().trim().replace(/\s/g, '')
+    const cleaned = code.trim().replace(/\s/g, '')
     if (!cleaned || cleaned.length < 4) {
       Alert.alert('Enter a code', 'Enter the invite code you received.')
       return
@@ -67,10 +67,11 @@ export default function JoinScreen() {
         <TextInput
           style={styles.input}
           value={code}
-          onChangeText={(v) => setCode(v.toUpperCase())}
-          placeholder="XXXXXXXX"
+          onChangeText={setCode}
+          placeholder="xxxxxxxx"
           placeholderTextColor={colors.textTertiary}
-          autoCapitalize="characters"
+          autoCapitalize="none"
+          autoCorrect={false}
           autoFocus
           maxLength={10}
           returnKeyType="done"

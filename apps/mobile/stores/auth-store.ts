@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import * as SecureStore from 'expo-secure-store'
+import { Platform } from 'react-native'
 import type { Profile, User } from '@lastnite/shared'
 
 const SESSION_TOKEN_KEY = 'session_token'
@@ -25,8 +26,10 @@ export const useAuthStore = create<AuthState>((set) => ({
   sessionToken: null,
 
   setSession: async (user, profile, token) => {
-    await SecureStore.setItemAsync(SESSION_TOKEN_KEY, token)
-    set({ isAuthenticated: true, user, profile, sessionToken: token })
+    if (Platform.OS !== 'web') {
+      await SecureStore.setItemAsync(SESSION_TOKEN_KEY, token)
+    }
+    set({ isAuthenticated: true, user, profile, sessionToken: token, isLoading: false })
   },
 
   setProfile: (profile) => set({ profile }),

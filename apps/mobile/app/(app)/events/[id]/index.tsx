@@ -513,14 +513,10 @@ export default function LiveEventScreen() {
         <Text style={s.feedButtonText}>View feed →</Text>
       </TouchableOpacity>
 
-      {/* Custom mission button */}
-      <TouchableOpacity
-        style={s.customMissionButton}
-        onPress={() => router.push(`/(app)/events/${id}/create-mission` as never)}
-        activeOpacity={0.8}
-      >
-        <Text style={s.customMissionText}>+ Create custom mission</Text>
-      </TouchableOpacity>
+      {/* Mission creation is locked during live events */}
+      <View style={s.missionsLockedBanner}>
+        <Text style={s.missionsLockedText}>🔒 Mission creation locked — event is live</Text>
+      </View>
 
         {/* Host panel */}
         {data.hostData && <HostPanel data={data.hostData} eventId={id!} />}
@@ -561,13 +557,13 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
   feedButtonText: { color: colors.text, fontSize: 15, fontWeight: '600' },
-  customMissionButton: {
+  missionsLockedBanner: {
     borderWidth: 1,
     borderColor: colors.border,
-    borderStyle: 'dashed',
     borderRadius: borderRadius.md,
     paddingVertical: spacing.sm,
     alignItems: 'center',
+    backgroundColor: colors.bgCard,
   },
-  customMissionText: { color: colors.textSecondary, fontSize: 14 },
+  missionsLockedText: { color: colors.textTertiary, fontSize: 13 },
 })

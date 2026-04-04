@@ -1,36 +1,42 @@
 import fp from 'fastify-plugin'
-import jwt from '@fastify/jwt'
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
-import { env } from '../lib/env.js'
+import { supabaseAdmin } from '../lib/supabase.js'
 
-// Supabase JWTs contain a `sub` (userId) and `role` claim
 export interface JwtPayload {
-  sub: string   // Supabase auth.users.id — matches our User.id
+  sub: string
   email?: string
   phone?: string
-  role: string  // 'authenticated' for logged-in users
+  role: string
   iat: number
   exp: number
 }
 
-// Tell @fastify/jwt what the decoded token shape is
-declare module '@fastify/jwt' {
-  interface FastifyJWT {
-    payload: JwtPayload
+declare module 'fastify' {
+  interface FastifyRequest {
     user: JwtPayload
   }
 }
 
 async function authPlugin(app: FastifyInstance) {
-  await app.register(jwt, {
-    secret: env.SUPABASE_JWT_SECRET,
-  })
+  app.decorateRequest('user', null)
 
   app.decorate('authenticate', async (request: FastifyRequest, reply: FastifyReply) => {
-    try {
-      await request.jwtVerify()
-    } catch {
-      reply.status(401).send({ error: 'Unauthorized', message: 'Invalid or expired token' })
+    const authHeader = request.headers.authorization
+    if (!authHeader?.startsWith('Bearer ')) {
+      return reply.status(401).send({ error: 'Unauthorized', message: 'Missing token' })
+    }
+    const token = authHeader.slice(7)
+    const { data, error } = await supabaseAdmin.auth.getUser(token)
+    if (error || !data.user) {
+      return reply.status(401).send({ error: 'Unauthorized', message: 'Invalid or expired token' })
+    }
+    request.user = {
+      sub: data.user.id,
+      email: data.user.email,
+      phone: data.user.phone,
+      role: 'authenticated',
+      iat: 0,
+      exp: 0,
     }
   })
 }
