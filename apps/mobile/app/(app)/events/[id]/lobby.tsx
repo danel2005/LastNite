@@ -252,6 +252,36 @@ export default function LobbyScreen() {
               </TouchableOpacity>
             )}
 
+            {isHost && (
+              <TouchableOpacity
+                style={styles.deleteEventButton}
+                onPress={() => {
+                  Alert.alert(
+                    'Delete event',
+                    'This will permanently delete the event and remove all participants. This cannot be undone.',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: 'Delete event',
+                        style: 'destructive',
+                        onPress: async () => {
+                          try {
+                            await apiClient.delete(`/events/${id}`)
+                            await qc.invalidateQueries({ queryKey: ['events'] })
+                            router.replace('/(app)/')
+                          } catch {
+                            Alert.alert('Error', 'Failed to delete event.')
+                          }
+                        },
+                      },
+                    ],
+                  )
+                }}
+              >
+                <Text style={styles.deleteEventText}>Delete event</Text>
+              </TouchableOpacity>
+            )}
+
             {!isHost && (
               <Text style={styles.waitingHint}>
                 Waiting for the host to start the event...
@@ -346,4 +376,13 @@ const styles = StyleSheet.create({
   buttonDisabled: { opacity: 0.5 },
   waitingHint: { ...typography.body, color: colors.textTertiary, textAlign: 'center', marginTop: spacing.md },
   missionNote: { ...typography.bodySmall, color: colors.textTertiary, textAlign: 'center', marginTop: 4 },
+  deleteEventButton: {
+    borderWidth: 1,
+    borderColor: colors.error,
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+    marginTop: spacing.lg,
+  },
+  deleteEventText: { color: colors.error, fontSize: 14, fontWeight: '600' },
 })
