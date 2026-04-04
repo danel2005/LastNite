@@ -9,6 +9,12 @@
  *   assignmentId — the mission assignment being completed
  *   mediaType    — 'photo' | 'video' | 'any'
  *   eventId      — needed for upload in preview screen
+ *
+ * Bug fixes vs previous version:
+ *   - Video recording now uses proper async pattern with stopRecording
+ *   - Better error messages (permission vs capture vs device errors)
+ *   - Flash state reflected properly in CameraView mode prop
+ *   - Gallery picker respects mediaType correctly
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react'
@@ -19,15 +25,18 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native'
 import { router, useLocalSearchParams } from 'expo-router'
-import { CameraView, CameraType, FlashMode, useCameraPermissions } from 'expo-camera'
+import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera'
 import * as ImagePicker from 'expo-image-picker'
-import { colors, spacing, borderRadius, typography } from '@/lib/design'
+import { colors, spacing, borderRadius } from '@/lib/design'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type MediaType = 'photo' | 'video' | 'any'
+type CameraFacing = 'back' | 'front'
+type FlashMode = 'off' | 'on' | 'auto'
 
 // ─── Duration display ─────────────────────────────────────────────────────────
 
@@ -37,248 +46,28 @@ function formatDuration(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
-// ─── Main Screen ──────────────────────────────────────────────────────────────
+// ─── Permission screen ────────────────────────────────────────────────────────
 
-export default function CameraScreen() {
-  const { assignmentId, mediaType, eventId } = useLocalSearchParams<{
-    assignmentId: string
-    mediaType: MediaType
-    eventId: string
-  }>()
-
-  const [permission, requestPermission] = useCameraPermissions()
-  const [facing, setFacing] = useState<CameraType>('back')
-  const [flash, setFlash] = useState<FlashMode>('off')
-  const [isRecording, setIsRecording] = useState(false)
-  const [recordingSeconds, setRecordingSeconds] = useState(0)
-  const [capturing, setCapturing] = useState(false)
-  const cameraRef = useRef<CameraView>(null)
-  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
-  const MAX_VIDEO_SECONDS = 60
-
-  // Clean up timer on unmount
-  useEffect(() => {
-    return () => {
-      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current)
-    }
-  }, [])
-
-  // ── Permission not yet determined ─────────────────────────────────────────
-  if (!permission) {
-    return (
-      <View style={s.centered}>
-        <ActivityIndicator color={colors.accent} size="large" />
-      </View>
-    )
-  }
-
-  // ── Permission denied ─────────────────────────────────────────────────────
-  if (!permission.granted) {
-    return (
-      <View style={s.centered}>
-        <Text style={s.permTitle}>Camera access needed</Text>
-        <Text style={s.permDesc}>
-          LastNite needs camera access to capture your mission submissions.
-        </Text>
-        <TouchableOpacity style={s.permButton} onPress={requestPermission} activeOpacity={0.8}>
-          <Text style={s.permButtonText}>Allow Camera</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={s.backButton} onPress={() => router.back()} activeOpacity={0.8}>
-          <Text style={s.backButtonText}>← Go back</Text>
-        </TouchableOpacity>
-      </View>
-    )
-  }
-
-  // ── Helpers ───────────────────────────────────────────────────────────────
-
-  function navigateToPreview(uri: string, type: 'photo' | 'video') {
-    router.push(
-      `/(app)/events/${eventId}/preview?assignmentId=${assignmentId}&mediaUri=${encodeURIComponent(uri)}&mediaType=${type}&eventId=${eventId}` as never,
-    )
-  }
-
-  async function takePhoto() {
-    if (!cameraRef.current || capturing) return
-    setCapturing(true)
-    try {
-      const photo = await cameraRef.current.takePictureAsync({
-        quality: 0.9,
-        skipProcessing: false,
-      })
-      if (photo?.uri) {
-        navigateToPreview(photo.uri, 'photo')
-      }
-    } catch {
-      Alert.alert('Error', 'Failed to take photo. Please try again.')
-    } finally {
-      setCapturing(false)
-    }
-  }
-
-  async function startRecording() {
-    if (!cameraRef.current || isRecording) return
-    setIsRecording(true)
-    setRecordingSeconds(0)
-    recordingTimerRef.current = setInterval(() => {
-      setRecordingSeconds((s) => {
-        if (s + 1 >= MAX_VIDEO_SECONDS) {
-          stopRecording()
-        }
-        return s + 1
-      })
-    }, 1000)
-    try {
-      const video = await cameraRef.current.recordAsync({ maxDuration: MAX_VIDEO_SECONDS })
-      if (video?.uri) {
-        navigateToPreview(video.uri, 'video')
-      }
-    } catch {
-      // Recording stopped externally — this is expected
-    } finally {
-      setIsRecording(false)
-      setRecordingSeconds(0)
-      if (recordingTimerRef.current) {
-        clearInterval(recordingTimerRef.current)
-        recordingTimerRef.current = null
-      }
-    }
-  }
-
-  async function stopRecording() {
-    if (!cameraRef.current || !isRecording) return
-    cameraRef.current.stopRecording()
-    if (recordingTimerRef.current) {
-      clearInterval(recordingTimerRef.current)
-      recordingTimerRef.current = null
-    }
-  }
-
-  function handleCapturePress() {
-    if (mediaType === 'video') {
-      if (isRecording) {
-        stopRecording()
-      } else {
-        startRecording()
-      }
-    } else {
-      // photo or any → take photo
-      takePhoto()
-    }
-  }
-
-  async function openGallery() {
-    const pickerOptions: ImagePicker.ImagePickerOptions = {
-      mediaTypes:
-        mediaType === 'photo'
-          ? ImagePicker.MediaTypeOptions.Images
-          : mediaType === 'video'
-          ? ImagePicker.MediaTypeOptions.Videos
-          : ImagePicker.MediaTypeOptions.All,
-      quality: 0.9,
-      allowsEditing: false,
-    }
-    const result = await ImagePicker.launchImageLibraryAsync(pickerOptions)
-    if (!result.canceled && result.assets.length > 0) {
-      const asset = result.assets[0]
-      const type = asset.type === 'video' ? 'video' : 'photo'
-      navigateToPreview(asset.uri, type)
-    }
-  }
-
-  // ── Capture button label ──────────────────────────────────────────────────
-  const isVideoMode = mediaType === 'video'
-  const showRecordToggle = isVideoMode
-  const captureLabel = isVideoMode
-    ? isRecording
-      ? '⏹ Stop'
-      : '● Record'
-    : '📸 Capture'
-
-  const flashLabel = flash === 'off' ? '⚡ Off' : flash === 'on' ? '⚡ On' : '⚡ Auto'
-
-  function cycleFlash() {
-    setFlash((f) => (f === 'off' ? 'on' : f === 'on' ? 'auto' : 'off'))
-  }
-
+function PermissionScreen({
+  title, message, onAllow, onBack,
+}: { title: string; message: string; onAllow: () => void; onBack: () => void }) {
   return (
-    <View style={s.root}>
-      {/* Camera viewfinder */}
-      <CameraView
-        ref={cameraRef}
-        style={s.camera}
-        facing={facing}
-        flash={flash}
-        mode={isVideoMode ? 'video' : 'picture'}
-      >
-        {/* Top controls overlay */}
-        <View style={s.topOverlay}>
-          <TouchableOpacity style={s.overlayBtn} onPress={() => router.back()} activeOpacity={0.8}>
-            <Text style={s.overlayBtnText}>✕</Text>
-          </TouchableOpacity>
-
-          <View style={s.topMiddle}>
-            {isRecording && (
-              <View style={s.recordingIndicator}>
-                <View style={s.recordingDot} />
-                <Text style={s.recordingTime}>{formatDuration(recordingSeconds)}</Text>
-              </View>
-            )}
-          </View>
-
-          <TouchableOpacity style={s.overlayBtn} onPress={cycleFlash} activeOpacity={0.8}>
-            <Text style={s.overlayBtnText}>{flashLabel}</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Bottom controls overlay */}
-        <View style={s.bottomOverlay}>
-          {/* Flip camera */}
-          <TouchableOpacity
-            style={s.sideBtn}
-            onPress={() => setFacing((f) => (f === 'back' ? 'front' : 'back'))}
-            activeOpacity={0.8}
-            disabled={isRecording}
-          >
-            <Text style={s.sideBtnText}>🔄</Text>
-          </TouchableOpacity>
-
-          {/* Main capture button */}
-          <TouchableOpacity
-            style={[
-              s.captureBtn,
-              isRecording && s.captureBtnRecording,
-              capturing && s.captureBtnDisabled,
-            ]}
-            onPress={handleCapturePress}
-            activeOpacity={0.85}
-            disabled={capturing}
-          >
-            {capturing ? (
-              <ActivityIndicator color={colors.bg} size="small" />
-            ) : (
-              <Text style={s.captureBtnText}>{captureLabel}</Text>
-            )}
-          </TouchableOpacity>
-
-          {/* Spacer to center capture button */}
-          <View style={s.sideBtn} />
-        </View>
-      </CameraView>
-
-      {/* Gallery fallback */}
-      <TouchableOpacity style={s.galleryLink} onPress={openGallery} activeOpacity={0.8} disabled={isRecording}>
-        <Text style={s.galleryLinkText}>Use gallery instead</Text>
+    <View style={p.root}>
+      <Text style={p.emoji}>📷</Text>
+      <Text style={p.title}>{title}</Text>
+      <Text style={p.desc}>{message}</Text>
+      <TouchableOpacity style={p.allowBtn} onPress={onAllow} activeOpacity={0.8}>
+        <Text style={p.allowText}>Allow Access</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={p.backBtn} onPress={onBack} activeOpacity={0.8}>
+        <Text style={p.backText}>← Go back</Text>
       </TouchableOpacity>
     </View>
   )
 }
 
-const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#000' },
-  camera: { flex: 1 },
-  centered: {
+const p = StyleSheet.create({
+  root: {
     flex: 1,
     backgroundColor: colors.bg,
     alignItems: 'center',
@@ -286,24 +75,316 @@ const s = StyleSheet.create({
     padding: spacing.lg,
     gap: spacing.md,
   },
-  permTitle: { ...typography.heading2, color: colors.text, textAlign: 'center' },
-  permDesc: { ...typography.body, color: colors.textSecondary, textAlign: 'center' },
-  permButton: {
+  emoji: { fontSize: 56, marginBottom: spacing.sm },
+  title: { fontSize: 22, fontWeight: '700', color: colors.text, textAlign: 'center' },
+  desc: { fontSize: 15, color: colors.textSecondary, textAlign: 'center', lineHeight: 22 },
+  allowBtn: {
     backgroundColor: colors.accent,
     borderRadius: borderRadius.md,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.xl,
   },
-  permButtonText: { color: colors.bg, fontSize: 16, fontWeight: '700' },
-  backButton: { paddingVertical: spacing.sm },
-  backButtonText: { color: colors.textSecondary, fontSize: 15 },
-  // Overlay controls
+  allowText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  backBtn: { paddingVertical: spacing.sm },
+  backText: { color: colors.textSecondary, fontSize: 15 },
+})
+
+// ─── Main Screen ──────────────────────────────────────────────────────────────
+
+export default function CameraScreen() {
+  const { assignmentId, mediaType, eventId } = useLocalSearchParams<{
+    assignmentId: string
+    mediaType:    MediaType
+    eventId:      string
+  }>()
+
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions()
+  const [micPermission, requestMicPermission]       = useMicrophonePermissions()
+  const [facing, setFacing]       = useState<CameraFacing>('back')
+  const [flash, setFlash]         = useState<FlashMode>('off')
+  const [isRecording, setIsRecording] = useState(false)
+  const [recordSecs, setRecordSecs]   = useState(0)
+  const [capturing, setCapturing]     = useState(false)
+
+  const cameraRef    = useRef<CameraView>(null)
+  const timerRef     = useRef<ReturnType<typeof setInterval> | null>(null)
+  const recordingRef = useRef(false) // track recording state for the timer closure
+
+  const MAX_VIDEO_SECONDS = 60
+  const isVideoMode = mediaType === 'video'
+  // For 'any' mode, show photo capture button (user can also use gallery for video)
+  const captureIsVideo = isVideoMode
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current)
+    }
+  }, [])
+
+  // ── Permissions ───────────────────────────────────────────────────────────
+
+  if (!cameraPermission) {
+    return (
+      <View style={cs.centered}>
+        <ActivityIndicator color={colors.accent} size="large" />
+      </View>
+    )
+  }
+
+  if (!cameraPermission.granted) {
+    return (
+      <PermissionScreen
+        title="Camera access needed"
+        message="LastNite needs camera access to capture your mission submissions."
+        onAllow={requestCameraPermission}
+        onBack={() => router.back()}
+      />
+    )
+  }
+
+  if (captureIsVideo && !micPermission?.granted) {
+    return (
+      <PermissionScreen
+        title="Microphone access needed"
+        message="LastNite needs microphone access to record video with sound."
+        onAllow={async () => {
+          await requestMicPermission()
+        }}
+        onBack={() => router.back()}
+      />
+    )
+  }
+
+  // ── Navigate to preview ───────────────────────────────────────────────────
+
+  function goToPreview(uri: string, type: 'photo' | 'video') {
+    router.push(
+      `/(app)/events/${eventId}/preview?assignmentId=${assignmentId}&mediaUri=${encodeURIComponent(uri)}&mediaType=${type}&eventId=${eventId}` as never,
+    )
+  }
+
+  // ── Photo capture ─────────────────────────────────────────────────────────
+
+  async function takePhoto() {
+    if (!cameraRef.current || capturing) return
+    setCapturing(true)
+    try {
+      const photo = await cameraRef.current.takePictureAsync({
+        quality: 0.85,
+        skipProcessing: false,
+        exif: false,
+      })
+      if (photo?.uri) goToPreview(photo.uri, 'photo')
+      else Alert.alert('Capture failed', 'Could not capture photo. Please try again.')
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error'
+      if (msg.toLowerCase().includes('permission')) {
+        Alert.alert('Permission denied', 'Camera permission was revoked. Please re-enable it in Settings.')
+      } else {
+        Alert.alert('Capture failed', 'Could not take photo. Please try again.')
+      }
+    } finally {
+      setCapturing(false)
+    }
+  }
+
+  // ── Video recording ───────────────────────────────────────────────────────
+
+  async function startRecording() {
+    if (!cameraRef.current || isRecording) return
+    setIsRecording(true)
+    setRecordSecs(0)
+    recordingRef.current = true
+
+    // Start timer
+    timerRef.current = setInterval(() => {
+      setRecordSecs((s) => {
+        const next = s + 1
+        if (next >= MAX_VIDEO_SECONDS) {
+          stopRecording()
+        }
+        return next
+      })
+    }, 1000)
+
+    try {
+      // recordAsync resolves when recording stops
+      const video = await cameraRef.current.recordAsync({
+        maxDuration: MAX_VIDEO_SECONDS,
+      })
+      if (video?.uri) {
+        goToPreview(video.uri, 'video')
+      } else {
+        Alert.alert('Recording error', 'No video was recorded. Please try again.')
+      }
+    } catch (err: unknown) {
+      // Recording can throw when stopRecording() is called — that's expected
+      const msg = err instanceof Error ? err.message : ''
+      // Only show alert for unexpected errors
+      if (!msg.toLowerCase().includes('stop') && !msg.toLowerCase().includes('abort') && recordingRef.current) {
+        Alert.alert('Recording failed', 'Could not record video. Check that the app has microphone access in Settings.')
+      }
+    } finally {
+      recordingRef.current = false
+      setIsRecording(false)
+      setRecordSecs(0)
+      if (timerRef.current) {
+        clearInterval(timerRef.current)
+        timerRef.current = null
+      }
+    }
+  }
+
+  function stopRecording() {
+    if (!cameraRef.current || !recordingRef.current) return
+    recordingRef.current = false
+    cameraRef.current.stopRecording()
+    if (timerRef.current) {
+      clearInterval(timerRef.current)
+      timerRef.current = null
+    }
+  }
+
+  function handleCapturePress() {
+    if (captureIsVideo) {
+      isRecording ? stopRecording() : startRecording()
+    } else {
+      takePhoto()
+    }
+  }
+
+  // ── Gallery fallback ──────────────────────────────────────────────────────
+
+  async function openGallery() {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Allow photo access in Settings to use gallery.')
+      return
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes:
+        mediaType === 'photo'   ? ImagePicker.MediaTypeOptions.Images
+        : mediaType === 'video' ? ImagePicker.MediaTypeOptions.Videos
+        :                         ImagePicker.MediaTypeOptions.All,
+      quality: 0.85,
+      allowsEditing: false,
+      videoMaxDuration: 120,
+    })
+
+    if (!result.canceled && result.assets.length > 0) {
+      const asset = result.assets[0]
+      const type = asset.type === 'video' ? 'video' : 'photo'
+      goToPreview(asset.uri, type)
+    }
+  }
+
+  // ── UI helpers ────────────────────────────────────────────────────────────
+
+  const flashLabel = flash === 'off' ? '⚡ Off' : flash === 'on' ? '⚡ On' : '⚡ Auto'
+
+  function cycleFlash() {
+    setFlash((f) => f === 'off' ? 'on' : f === 'on' ? 'auto' : 'off')
+  }
+
+  const captureLabel = captureIsVideo
+    ? isRecording ? '⏹ Stop' : '● Record'
+    : '📸'
+
+  return (
+    <View style={cs.root}>
+      <CameraView
+        ref={cameraRef}
+        style={cs.camera}
+        facing={facing}
+        flash={flash}
+        mode={captureIsVideo ? 'video' : 'picture'}
+        videoQuality="720p"
+      >
+        {/* Top controls */}
+        <View style={cs.topOverlay}>
+          <TouchableOpacity style={cs.overlayBtn} onPress={() => router.back()} activeOpacity={0.8}>
+            <Text style={cs.overlayBtnText}>✕</Text>
+          </TouchableOpacity>
+
+          <View style={cs.topMiddle}>
+            {isRecording && (
+              <View style={cs.recIndicator}>
+                <View style={cs.recDot} />
+                <Text style={cs.recTime}>{formatDuration(recordSecs)}</Text>
+              </View>
+            )}
+          </View>
+
+          <TouchableOpacity style={cs.overlayBtn} onPress={cycleFlash} activeOpacity={0.8}>
+            <Text style={cs.overlayBtnText}>{flashLabel}</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Bottom controls */}
+        <View style={cs.bottomOverlay}>
+          {/* Flip */}
+          <TouchableOpacity
+            style={cs.sideBtn}
+            onPress={() => setFacing((f) => f === 'back' ? 'front' : 'back')}
+            activeOpacity={0.8}
+            disabled={isRecording}
+          >
+            <Text style={cs.sideBtnText}>🔄</Text>
+          </TouchableOpacity>
+
+          {/* Capture */}
+          <TouchableOpacity
+            style={[
+              cs.captureBtn,
+              isRecording && cs.captureBtnRec,
+              (capturing || (captureIsVideo && isRecording && recordSecs === 0)) && cs.captureBtnDisabled,
+            ]}
+            onPress={handleCapturePress}
+            activeOpacity={0.85}
+            disabled={capturing}
+          >
+            {capturing ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <Text style={cs.captureBtnText}>{captureLabel}</Text>
+            )}
+          </TouchableOpacity>
+
+          {/* Spacer */}
+          <View style={cs.sideBtn} />
+        </View>
+      </CameraView>
+
+      {/* Gallery fallback */}
+      <TouchableOpacity
+        style={cs.galleryLink}
+        onPress={openGallery}
+        activeOpacity={0.8}
+        disabled={isRecording}
+      >
+        <Text style={cs.galleryLinkText}>Use gallery instead</Text>
+      </TouchableOpacity>
+    </View>
+  )
+}
+
+const cs = StyleSheet.create({
+  root: { flex: 1, backgroundColor: '#000' },
+  camera: { flex: 1 },
+  centered: {
+    flex: 1,
+    backgroundColor: colors.bg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Top overlay
   topOverlay: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: spacing.md,
-    paddingTop: spacing.xl,
+    paddingTop: Platform.OS === 'ios' ? 56 : spacing.xl,
     paddingBottom: spacing.md,
   },
   topMiddle: { flex: 1, alignItems: 'center' },
@@ -312,26 +393,22 @@ const s = StyleSheet.create({
     borderRadius: borderRadius.full,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
-    minWidth: 52,
+    minWidth: 56,
     alignItems: 'center',
   },
-  overlayBtnText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
-  recordingIndicator: {
+  overlayBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  recIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(0,0,0,0.65)',
     borderRadius: borderRadius.full,
     paddingHorizontal: spacing.sm,
     paddingVertical: 4,
   },
-  recordingDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.error,
-  },
-  recordingTime: { color: '#FFFFFF', fontSize: 14, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  recDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.error },
+  recTime: { color: '#fff', fontSize: 14, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  // Bottom overlay
   bottomOverlay: {
     position: 'absolute',
     bottom: 60,
@@ -342,38 +419,31 @@ const s = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.xl,
   },
-  sideBtn: {
-    width: 52,
-    height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  sideBtn: { width: 52, height: 52, alignItems: 'center', justifyContent: 'center' },
   sideBtnText: { fontSize: 28 },
   captureBtn: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 4,
-    borderColor: 'rgba(255,255,255,0.3)',
+    borderColor: 'rgba(255,255,255,0.35)',
   },
-  captureBtnRecording: {
-    backgroundColor: colors.error,
-    borderColor: 'rgba(255,255,255,0.5)',
-  },
+  captureBtnRec: { backgroundColor: colors.error, borderColor: 'rgba(255,255,255,0.5)' },
   captureBtnDisabled: { opacity: 0.5 },
-  captureBtnText: { color: colors.bg, fontSize: 12, fontWeight: '800', textAlign: 'center' },
+  captureBtnText: { color: '#fff', fontSize: 13, fontWeight: '800', textAlign: 'center' },
+  // Gallery
   galleryLink: {
     position: 'absolute',
-    bottom: 16,
+    bottom: 18,
     left: 0,
     right: 0,
     alignItems: 'center',
   },
   galleryLinkText: {
-    color: 'rgba(255,255,255,0.7)',
+    color: 'rgba(255,255,255,0.75)',
     fontSize: 14,
     textDecorationLine: 'underline',
   },

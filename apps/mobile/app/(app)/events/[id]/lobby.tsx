@@ -201,21 +201,38 @@ export default function LobbyScreen() {
               <CountdownDisplay startsAt={event.startsAt} />
             </View>
 
-            {/* Invite code */}
-            <TouchableOpacity
-              style={styles.inviteRow}
-              onPress={() =>
-                Share.share({
-                  message: `Join "${event.title}" on LastNite — code: ${event.inviteCode}`,
-                })
-              }
-            >
-              <View>
+            {/* Invite section */}
+            <View style={styles.inviteSection}>
+              <View style={styles.inviteCodeBlock}>
                 <Text style={styles.inviteLabel}>Invite code</Text>
                 <Text style={styles.inviteCode}>{event.inviteCode}</Text>
               </View>
-              <Text style={styles.inviteShare}>Share →</Text>
-            </TouchableOpacity>
+              <View style={styles.inviteButtons}>
+                <TouchableOpacity
+                  style={styles.shareBtn}
+                  onPress={() =>
+                    Share.share({
+                      message: `Join "${event.title}" on LastNite!\n\nDownload LastNite and enter code: ${event.inviteCode}`,
+                    })
+                  }
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.shareBtnText}>📤 Share invite</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.copyBtn}
+                  onPress={() =>
+                    Share.share({
+                      message: event.inviteCode,
+                      title: 'LastNite invite code',
+                    })
+                  }
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.copyBtnText}>Copy code</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
 
             <Text style={styles.sectionHeader}>
               Participants ({participants?.length ?? 0})
@@ -315,18 +332,36 @@ const styles = StyleSheet.create({
   countdown: { fontSize: 48, fontWeight: '900', color: colors.accent, letterSpacing: -2 },
   countdownColon: { fontSize: 40, fontWeight: '900', color: colors.accent, marginBottom: 14, paddingHorizontal: 2 },
   countdownUnitLabel: { ...typography.label, color: colors.textSecondary, fontSize: 10, letterSpacing: 1, marginTop: 2 },
-  inviteRow: {
+  inviteSection: {
     backgroundColor: colors.bgCard,
     borderRadius: borderRadius.lg,
     padding: spacing.md,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: spacing.xl,
+    gap: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  inviteLabel: { ...typography.label, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 1 },
-  inviteCode: { fontSize: 22, fontWeight: '900', color: colors.accent, letterSpacing: 4, marginTop: 2 },
-  inviteShare: { color: colors.accent, fontWeight: '700', fontSize: 15 },
+  inviteCodeBlock: { alignItems: 'center' },
+  inviteLabel: { ...typography.label, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 },
+  inviteCode: { fontSize: 32, fontWeight: '900', color: colors.accent, letterSpacing: 6 },
+  inviteButtons: { flexDirection: 'row', gap: spacing.sm },
+  shareBtn: {
+    flex: 2,
+    backgroundColor: colors.accent,
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+  },
+  shareBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  copyBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+  },
+  copyBtnText: { color: colors.textSecondary, fontWeight: '600', fontSize: 13 },
   sectionHeader: { ...typography.label, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 1, marginBottom: spacing.sm },
   participantRow: {
     flexDirection: 'row',

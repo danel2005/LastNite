@@ -8,7 +8,7 @@
  *   3. POST /events/:id/submissions/:id/confirm
  *
  * Has retry logic (3 attempts, exponential backoff) and
- * network loss detection.
+ * proper error categorisation (network, permission, upload, etc.)
  *
  * Route params: assignmentId, mediaUri, mediaType, eventId
  */
@@ -21,7 +21,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  AppState,
   Platform,
 } from 'react-native'
 import { router, useLocalSearchParams } from 'expo-router'
@@ -32,12 +31,16 @@ import { queryClient } from '@/lib/query-client'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type UploadState =
-  | { phase: 'idle' }
-  | { phase: 'uploading'; progress: number }
-  | { phase: 'success' }
-  | { phase: 'error'; message: string; attempt: number }
-  | { phase: 'offline' }
+type UploadPhase = 'idle' | 'uploading' | 'success' | 'error' | 'offline'
+
+interface UploadState {
+  phase:    UploadPhase
+  progress: number
+  message:  string | null
+}
+
+const IDLE: UploadState    = { phase: 'idle',    progress: 0,   message: null }
+const OFFLINE: UploadState = { phase: 'offline', progress: 0,   message: 'No internet connection. Connect and retry.' }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -48,26 +51,59 @@ function sleep(ms: number) {
 function getMimeType(uri: string, mediaType: 'photo' | 'video'): string {
   const lower = uri.toLowerCase()
   if (mediaType === 'video') {
-    if (lower.endsWith('.mov')) return 'video/quicktime'
+    if (lower.includes('.mov') || lower.includes('mov')) return 'video/quicktime'
     return 'video/mp4'
   }
-  if (lower.endsWith('.png')) return 'image/png'
+  if (lower.includes('.png')) return 'image/png'
   return 'image/jpeg'
 }
 
+/**
+ * Lightweight connectivity check using a HEAD request to a known endpoint.
+ * Avoids false negatives from google being blocked.
+ * Returns true if we can reach the network at all.
+ */
 async function checkConnectivity(): Promise<boolean> {
+  // On web, assume connected (navigator.onLine is more reliable)
+  if (Platform.OS === 'web') return navigator.onLine !== false
+
   try {
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 3000)
-    await fetch('https://www.google.com/favicon.ico', {
+    const timeoutId = setTimeout(() => controller.abort(), 4000)
+    // Use Cloudflare's 1.1.1.1 which is extremely reliable and fast
+    const res = await fetch('https://1.1.1.1/', {
       method: 'HEAD',
       signal: controller.signal,
+      cache: 'no-store',
     })
     clearTimeout(timeoutId)
-    return true
+    return res.ok || res.status < 500 // any response = we have connectivity
   } catch {
+    // If that fails too, we're truly offline
     return false
   }
+}
+
+function categoriseError(err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err)
+  const lower = msg.toLowerCase()
+
+  if (lower.includes('cancelled') || lower.includes('cancel')) {
+    return 'Upload cancelled.'
+  }
+  if (lower.includes('network') || lower.includes('fetch') || lower.includes('timeout')) {
+    return 'Network error. Check your connection and retry.'
+  }
+  if (lower.includes('403') || lower.includes('401')) {
+    return 'Permission denied. Try rejoining the event.'
+  }
+  if (lower.includes('413') || lower.includes('too large')) {
+    return 'File is too large. Try a shorter video or lower quality photo.'
+  }
+  if (lower.includes('status 4') || lower.includes('status 5')) {
+    return `Upload failed (${msg}). Please retry.`
+  }
+  return 'Upload failed. Please retry.'
 }
 
 // ─── Upload function with retry ───────────────────────────────────────────────
@@ -88,7 +124,7 @@ async function uploadSubmission(
     if (signal.aborted) throw new Error('Cancelled')
 
     try {
-      onProgress(5)
+      onProgress(5 + attempt * 2)
 
       // Step 1: Init submission — get upload URL
       const initRes = await apiClient.post(`/events/${eventId}/submissions/init`, {
@@ -102,15 +138,13 @@ async function uploadSubmission(
       }
 
       if (signal.aborted) throw new Error('Cancelled')
-      onProgress(15)
+      onProgress(20)
 
-      // Step 2: Upload file to signed URL
-      // expo-file-system uploadAsync gives us progress callbacks
+      // Step 2: Upload file to signed URL using expo-file-system
+      // This handles large files better than fetch() and supports progress tracking
       const uploadResult = await FileSystem.uploadAsync(uploadUrl, mediaUri, {
         httpMethod: 'PUT',
-        headers: {
-          'Content-Type': mimeType,
-        },
+        headers: { 'Content-Type': mimeType },
         uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
         sessionType: FileSystem.FileSystemSessionType.FOREGROUND,
       })
@@ -118,7 +152,7 @@ async function uploadSubmission(
       if (signal.aborted) throw new Error('Cancelled')
 
       if (uploadResult.status < 200 || uploadResult.status >= 300) {
-        throw new Error(`Upload failed with status ${uploadResult.status}`)
+        throw new Error(`Upload responded with status ${uploadResult.status}`)
       }
 
       onProgress(85)
@@ -130,13 +164,15 @@ async function uploadSubmission(
       // Invalidate live event query so dashboard refreshes
       await queryClient.invalidateQueries({ queryKey: ['live', eventId] })
       return // success
+
     } catch (err) {
-      lastError = err instanceof Error ? err : new Error('Unknown error')
+      lastError = err instanceof Error ? err : new Error(String(err))
 
       if (signal.aborted) throw new Error('Cancelled')
+      if (lastError.message === 'Cancelled') throw lastError
 
       if (attempt < MAX_RETRIES) {
-        const backoffMs = Math.pow(2, attempt - 1) * 1000 // 1s, 2s, 4s
+        const backoffMs = Math.pow(2, attempt - 1) * 1500
         await sleep(backoffMs)
       }
     }
@@ -163,11 +199,70 @@ const pb = StyleSheet.create({
     overflow: 'hidden',
     width: '100%',
   },
-  fill: {
-    height: '100%',
-    backgroundColor: colors.accent,
-    borderRadius: borderRadius.full,
+  fill: { height: '100%', backgroundColor: colors.accent, borderRadius: borderRadius.full },
+})
+
+// ─── Error Banner ─────────────────────────────────────────────────────────────
+
+function StatusBanner({ state }: { state: UploadState }) {
+  if (state.phase === 'offline') {
+    return (
+      <View style={[banner.base, banner.offline]}>
+        <Text style={banner.icon}>📡</Text>
+        <View>
+          <Text style={banner.title}>No internet connection</Text>
+          <Text style={banner.sub}>Connect to Wi-Fi or mobile data, then retry.</Text>
+        </View>
+      </View>
+    )
+  }
+  if (state.phase === 'error') {
+    return (
+      <View style={[banner.base, banner.error]}>
+        <Text style={banner.icon}>⚠️</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={banner.title}>Upload failed</Text>
+          <Text style={banner.sub}>{state.message ?? 'Check your connection and retry.'}</Text>
+        </View>
+      </View>
+    )
+  }
+  if (state.phase === 'success') {
+    return (
+      <View style={[banner.base, banner.success]}>
+        <Text style={banner.icon}>✅</Text>
+        <View>
+          <Text style={[banner.title, { color: colors.success }]}>Submitted!</Text>
+          <Text style={banner.sub}>Returning to event...</Text>
+        </View>
+      </View>
+    )
+  }
+  return null
+}
+
+const banner = StyleSheet.create({
+  base: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    borderWidth: 1,
   },
+  offline: { backgroundColor: colors.bgCard, borderColor: colors.border },
+  error: {
+    backgroundColor: 'rgba(244,63,94,0.1)',
+    borderColor: colors.error,
+  },
+  success: {
+    backgroundColor: 'rgba(34,197,94,0.1)',
+    borderColor: colors.success,
+    alignItems: 'center',
+  },
+  icon: { fontSize: 20 },
+  title: { ...typography.body, color: colors.text, fontWeight: '700' },
+  sub: { ...typography.bodySmall, color: colors.textSecondary, marginTop: 2 },
 })
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
@@ -175,36 +270,26 @@ const pb = StyleSheet.create({
 export default function PreviewScreen() {
   const { assignmentId, mediaUri, mediaType, eventId } = useLocalSearchParams<{
     assignmentId: string
-    mediaUri: string
-    mediaType: 'photo' | 'video'
-    eventId: string
+    mediaUri:     string
+    mediaType:    'photo' | 'video'
+    eventId:      string
   }>()
 
   const decodedUri = decodeURIComponent(mediaUri ?? '')
-  const [uploadState, setUploadState] = useState<UploadState>({ phase: 'idle' })
-  const [abortController, setAbortController] = useState<AbortController | null>(null)
-
-  // Detect app going background (network loss hint)
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', (nextState) => {
-      if (nextState === 'background' && uploadState.phase === 'uploading') {
-        // Keep uploading in background via foreground session — just note it
-      }
-    })
-    return () => sub.remove()
-  }, [uploadState.phase])
+  const [state, setState]               = useState<UploadState>(IDLE)
+  const [abortController, setAbortCtrl] = useState<AbortController | null>(null)
 
   const startUpload = useCallback(async () => {
-    // Check connectivity first
+    // 1. Check connectivity before attempting upload
     const online = await checkConnectivity()
     if (!online) {
-      setUploadState({ phase: 'offline' })
+      setState(OFFLINE)
       return
     }
 
     const controller = new AbortController()
-    setAbortController(controller)
-    setUploadState({ phase: 'uploading', progress: 0 })
+    setAbortCtrl(controller)
+    setState({ phase: 'uploading', progress: 0, message: null })
 
     try {
       await uploadSubmission(
@@ -214,52 +299,49 @@ export default function PreviewScreen() {
         mediaType ?? 'photo',
         (pct) => {
           if (!controller.signal.aborted) {
-            setUploadState({ phase: 'uploading', progress: pct })
+            setState({ phase: 'uploading', progress: pct, message: null })
           }
         },
         controller.signal,
       )
-      setUploadState({ phase: 'success' })
+      setState({ phase: 'success', progress: 100, message: null })
     } catch (err) {
-      if (controller.signal.aborted) return // user cancelled
-      const msg = err instanceof Error ? err.message : 'Upload failed'
+      if (controller.signal.aborted) return
+      const msg = err instanceof Error ? err.message : String(err)
+      if (msg === 'Cancelled') return
 
-      // Check if it's an offline error
+      // Distinguish between offline and other errors
       const stillOnline = await checkConnectivity()
       if (!stillOnline) {
-        setUploadState({ phase: 'offline' })
+        setState(OFFLINE)
       } else {
-        setUploadState({ phase: 'error', message: msg, attempt: 3 })
+        setState({ phase: 'error', progress: 0, message: categoriseError(err) })
       }
     } finally {
-      setAbortController(null)
+      setAbortCtrl(null)
     }
   }, [eventId, assignmentId, decodedUri, mediaType])
 
   // Auto-navigate on success
   useEffect(() => {
-    if (uploadState.phase === 'success') {
+    if (state.phase === 'success') {
       const timeout = setTimeout(() => {
         router.replace(`/(app)/events/${eventId}` as never)
       }, 1800)
       return () => clearTimeout(timeout)
     }
-  }, [uploadState.phase, eventId])
+  }, [state.phase, eventId])
 
-  // ── Render ────────────────────────────────────────────────────────────────
-
-  const isUploading = uploadState.phase === 'uploading'
-  const isSuccess = uploadState.phase === 'success'
-  const isIdle = uploadState.phase === 'idle'
-  const isError = uploadState.phase === 'error'
-  const isOffline = uploadState.phase === 'offline'
+  const isUploading = state.phase === 'uploading'
+  const isSuccess   = state.phase === 'success'
+  const isIdle      = state.phase === 'idle'
+  const canRetry    = state.phase === 'error' || state.phase === 'offline'
 
   return (
     <View style={s.root}>
       {/* Media preview */}
       <View style={s.previewContainer}>
         {mediaType === 'video' ? (
-          // Video placeholder — show first frame indication
           <View style={s.videoPlaceholder}>
             <Text style={s.videoIcon}>🎬</Text>
             <Text style={s.videoLabel}>Video captured</Text>
@@ -276,38 +358,17 @@ export default function PreviewScreen() {
 
       {/* Status + controls */}
       <View style={s.controls}>
-        {isOffline && (
-          <View style={s.offlineBanner}>
-            <Text style={s.offlineText}>📡 No internet connection</Text>
-            <Text style={s.offlineSub}>Upload paused — waiting for connection</Text>
-          </View>
-        )}
-
-        {isError && (
-          <View style={s.errorBanner}>
-            <Text style={s.errorText}>Upload failed</Text>
-            <Text style={s.errorSub}>All retries exhausted. Check your connection.</Text>
-          </View>
-        )}
-
-        {isSuccess && (
-          <View style={s.successBanner}>
-            <Text style={s.successEmoji}>✅</Text>
-            <Text style={s.successText}>Submitted!</Text>
-            <Text style={s.successSub}>Returning to event...</Text>
-          </View>
-        )}
+        <StatusBanner state={state} />
 
         {isUploading && (
           <View style={s.progressBlock}>
             <Text style={s.progressLabel}>
-              Uploading... {Math.round(uploadState.progress)}%
+              Uploading... {Math.round(state.progress)}%
             </Text>
-            <ProgressBar progress={uploadState.progress} />
+            <ProgressBar progress={state.progress} />
           </View>
         )}
 
-        {/* Buttons */}
         {!isSuccess && (
           <View style={s.buttonRow}>
             {/* Retake — go back to camera */}
@@ -323,15 +384,10 @@ export default function PreviewScreen() {
               <Text style={s.retakeBtnText}>← Retake</Text>
             </TouchableOpacity>
 
-            {/* Use this / Retry */}
-            {(isIdle || isError || isOffline) && (
-              <TouchableOpacity
-                style={s.useBtn}
-                onPress={startUpload}
-                activeOpacity={0.85}
-              >
+            {(isIdle || canRetry) && (
+              <TouchableOpacity style={s.useBtn} onPress={startUpload} activeOpacity={0.85}>
                 <Text style={s.useBtnText}>
-                  {isError || isOffline ? 'Retry →' : 'Use this →'}
+                  {canRetry ? 'Retry →' : 'Submit →'}
                 </Text>
               </TouchableOpacity>
             )}
@@ -341,7 +397,7 @@ export default function PreviewScreen() {
                 style={s.cancelBtn}
                 onPress={() => {
                   if (abortController) abortController.abort()
-                  setUploadState({ phase: 'idle' })
+                  setState(IDLE)
                 }}
                 activeOpacity={0.8}
               >
@@ -375,35 +431,8 @@ const s = StyleSheet.create({
     paddingVertical: spacing.lg,
     paddingBottom: spacing.xxl,
     gap: spacing.md,
+    minHeight: 160,
   },
-  offlineBanner: {
-    backgroundColor: colors.bgCard,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: spacing.xs,
-  },
-  offlineText: { ...typography.body, color: colors.text, fontWeight: '700' },
-  offlineSub: { ...typography.bodySmall, color: colors.textSecondary },
-  errorBanner: {
-    backgroundColor: 'rgba(255,92,92,0.12)',
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.error,
-    gap: spacing.xs,
-  },
-  errorText: { ...typography.body, color: colors.error, fontWeight: '700' },
-  errorSub: { ...typography.bodySmall, color: colors.textSecondary },
-  successBanner: {
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.md,
-  },
-  successEmoji: { fontSize: 48 },
-  successText: { ...typography.heading2, color: colors.success },
-  successSub: { ...typography.body, color: colors.textSecondary },
   progressBlock: { gap: spacing.sm },
   progressLabel: { ...typography.bodySmall, color: colors.textSecondary, textAlign: 'center' },
   buttonRow: { flexDirection: 'row', gap: spacing.sm },
@@ -423,7 +452,7 @@ const s = StyleSheet.create({
     paddingVertical: spacing.md,
     alignItems: 'center',
   },
-  useBtnText: { color: colors.bg, fontSize: 16, fontWeight: '700' },
+  useBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   cancelBtn: {
     flex: 2,
     borderWidth: 1,
