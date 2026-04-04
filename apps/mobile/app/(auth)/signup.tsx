@@ -13,8 +13,6 @@ import {
 import { router } from 'expo-router'
 import { colors, spacing, borderRadius, typography } from '@/lib/design'
 import { apiClient } from '@/lib/api-client'
-import { useAuthStore } from '@/stores/auth-store'
-import type { User, Profile } from '@lastnite/shared'
 
 // ─── Inline error helper ──────────────────────────────────────────────────────
 
@@ -22,66 +20,54 @@ function FieldError({ message }: { message: string | null }) {
   if (!message) return null
   return <Text style={fe.text}>{message}</Text>
 }
-
-const fe = StyleSheet.create({
-  text: { color: colors.error, fontSize: 13, marginTop: 4 },
-})
+const fe = StyleSheet.create({ text: { color: colors.error, fontSize: 13, marginTop: 4 } })
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-export default function LoginScreen() {
-  const [phone, setPhone]       = useState('')
-  const [password, setPassword] = useState('')
-  const [loading, setLoading]   = useState(false)
-  const [errors, setErrors]     = useState<{ phone?: string; password?: string; general?: string }>({})
-  const setSession              = useAuthStore((s) => s.setSession)
+export default function SignupScreen() {
+  const [phone, setPhone]             = useState('')
+  const [password, setPassword]       = useState('')
+  const [confirmPassword, setConfirm] = useState('')
+  const [loading, setLoading]         = useState(false)
+  const [errors, setErrors]           = useState<{
+    phone?: string; password?: string; confirm?: string; general?: string
+  }>({})
 
   function validate(): boolean {
     const e: typeof errors = {}
     const cleaned = phone.replace(/\s/g, '').trim()
     if (!cleaned) e.phone = 'Phone number is required.'
-    else if (!/^\+[1-9]\d{6,14}$/.test(cleaned)) e.phone = 'Use E.164 format — e.g. +972501234567'
+    else if (!/^\+[1-9]\d{6,14}$/.test(cleaned))
+      e.phone = 'Use E.164 format — e.g. +972501234567'
     if (!password) e.password = 'Password is required.'
+    else if (password.length < 8) e.password = 'Password must be at least 8 characters.'
+    if (!confirmPassword) e.confirm = 'Please confirm your password.'
+    else if (password !== confirmPassword) e.confirm = 'Passwords do not match.'
     setErrors(e)
     return Object.keys(e).length === 0
   }
 
-  async function handleSignIn() {
+  async function handleSignup() {
     if (!validate()) return
     const cleaned = phone.replace(/\s/g, '').trim()
     setLoading(true)
     setErrors({})
     try {
-      const res = await apiClient.post('/auth/signin', { phone: cleaned, password })
-      const data = res.data as {
-        session: { accessToken: string }
-        user: { id: string; phone: string | null; email: string | null }
-        profile: Profile | null
-      }
-      const now = new Date().toISOString()
-      const user: User = {
-        id: data.user.id,
-        phone: data.user.phone ?? null,
-        email: data.user.email ?? null,
-        createdAt: now,
-        updatedAt: now,
-      }
-      await setSession(user, data.profile, data.session.accessToken)
-
-      if (!data.profile?.displayName) {
-        router.replace('/(auth)/profile-setup')
-      } else {
-        router.replace('/(app)/')
-      }
+      await apiClient.post('/auth/signup', { phone: cleaned, password })
+      // Navigate to OTP verification — pass phone + context so verify knows this is signup
+      router.push({
+        pathname: '/(auth)/verify' as never,
+        params: { phone: cleaned, mode: 'signup' },
+      })
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { error?: string } } })?.response?.data?.error
-      if (msg?.toLowerCase().includes('invalid') || msg?.toLowerCase().includes('credentials')) {
-        setErrors({ general: 'Incorrect phone number or password.' })
-      } else if (msg?.toLowerCase().includes('not found') || msg?.toLowerCase().includes('no account')) {
-        setErrors({ phone: 'No account found for this number. Sign up first.' })
+      if (msg?.toLowerCase().includes('already') || msg?.toLowerCase().includes('registered')) {
+        setErrors({ phone: 'An account with this number already exists. Try signing in.' })
+      } else if (msg?.toLowerCase().includes('phone')) {
+        setErrors({ phone: msg })
       } else {
-        setErrors({ general: msg ?? 'Sign in failed. Please try again.' })
+        setErrors({ general: msg ?? 'Failed to create account. Please try again.' })
       }
     } finally {
       setLoading(false)
@@ -94,22 +80,19 @@ export default function LoginScreen() {
       style={s.root}
     >
       <ScrollView contentContainerStyle={s.container} keyboardShouldPersistTaps="handled">
-        {/* Brand header */}
         <View style={s.header}>
           <Text style={s.logo}>LastNite</Text>
-          <Text style={s.tagline}>The night remembers everything.</Text>
+          <Text style={s.subtitle}>Create your account</Text>
         </View>
 
-        {/* General error */}
         {errors.general && (
           <View style={s.errorBanner}>
             <Text style={s.errorBannerText}>{errors.general}</Text>
           </View>
         )}
 
-        {/* Form */}
         <View style={s.form}>
-          <View style={s.fieldGroup}>
+          <View>
             <Text style={s.label}>Phone number</Text>
             <TextInput
               style={[s.input, errors.phone ? s.inputError : null]}
@@ -124,53 +107,62 @@ export default function LoginScreen() {
               editable={!loading}
             />
             <FieldError message={errors.phone ?? null} />
+            <Text style={s.hint}>
+              We'll send a one-time code to verify your number.
+            </Text>
           </View>
 
-          <View style={s.fieldGroup}>
+          <View>
             <Text style={s.label}>Password</Text>
             <TextInput
               style={[s.input, errors.password ? s.inputError : null]}
               value={password}
               onChangeText={(v) => { setPassword(v); setErrors((e) => ({ ...e, password: undefined })) }}
-              placeholder="••••••••"
+              placeholder="Min. 8 characters"
               placeholderTextColor={colors.textTertiary}
               secureTextEntry
-              autoComplete="current-password"
-              returnKeyType="done"
-              onSubmitEditing={handleSignIn}
+              autoComplete="new-password"
+              returnKeyType="next"
               editable={!loading}
             />
             <FieldError message={errors.password ?? null} />
           </View>
 
-          {/* Forgot password */}
-          <TouchableOpacity
-            onPress={() => router.push('/(auth)/forgot-password' as never)}
-            style={s.forgotRow}
-          >
-            <Text style={s.forgotText}>Forgot password?</Text>
-          </TouchableOpacity>
+          <View>
+            <Text style={s.label}>Confirm password</Text>
+            <TextInput
+              style={[s.input, errors.confirm ? s.inputError : null]}
+              value={confirmPassword}
+              onChangeText={(v) => { setConfirm(v); setErrors((e) => ({ ...e, confirm: undefined })) }}
+              placeholder="Repeat your password"
+              placeholderTextColor={colors.textTertiary}
+              secureTextEntry
+              autoComplete="new-password"
+              returnKeyType="done"
+              onSubmitEditing={handleSignup}
+              editable={!loading}
+            />
+            <FieldError message={errors.confirm ?? null} />
+          </View>
 
-          {/* Sign in button */}
           <TouchableOpacity
             style={[s.button, loading && s.buttonDisabled]}
-            onPress={handleSignIn}
+            onPress={handleSignup}
             disabled={loading}
             activeOpacity={0.85}
           >
             {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={s.buttonText}>Sign In</Text>
+              <Text style={s.buttonText}>Continue →</Text>
             )}
           </TouchableOpacity>
         </View>
 
-        {/* Sign up link */}
         <View style={s.footer}>
-          <Text style={s.footerText}>Don't have an account? </Text>
-          <TouchableOpacity onPress={() => router.push('/(auth)/signup' as never)}>
-            <Text style={s.footerLink}>Sign Up</Text>
+          <Text style={s.footerText}>Already have an account? </Text>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Text style={s.footerLink}>Sign In</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -187,13 +179,8 @@ const s = StyleSheet.create({
     paddingBottom: spacing.xxl,
   },
   header: { marginBottom: spacing.xxl },
-  logo: {
-    fontSize: 48,
-    fontWeight: '900',
-    color: colors.accent,
-    letterSpacing: -1,
-  },
-  tagline: { ...typography.body, color: colors.textSecondary, marginTop: spacing.xs },
+  logo: { fontSize: 40, fontWeight: '900', color: colors.accent, letterSpacing: -1 },
+  subtitle: { ...typography.body, color: colors.textSecondary, marginTop: spacing.xs },
   errorBanner: {
     backgroundColor: 'rgba(244,63,94,0.12)',
     borderWidth: 1,
@@ -204,7 +191,6 @@ const s = StyleSheet.create({
   },
   errorBannerText: { color: colors.error, fontSize: 14 },
   form: { gap: spacing.md },
-  fieldGroup: { gap: 0 },
   label: {
     ...typography.label,
     color: colors.textSecondary,
@@ -223,8 +209,7 @@ const s = StyleSheet.create({
     fontSize: 17,
   },
   inputError: { borderColor: colors.error },
-  forgotRow: { alignSelf: 'flex-end', marginTop: -spacing.xs },
-  forgotText: { ...typography.bodySmall, color: colors.indigo, fontWeight: '600' },
+  hint: { ...typography.bodySmall, color: colors.textTertiary, marginTop: 5 },
   button: {
     backgroundColor: colors.accent,
     borderRadius: borderRadius.md,
@@ -234,11 +219,7 @@ const s = StyleSheet.create({
   },
   buttonDisabled: { opacity: 0.6 },
   buttonText: { color: '#fff', fontSize: 16, fontWeight: '700', letterSpacing: 0.3 },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: spacing.xl,
-  },
+  footer: { flexDirection: 'row', justifyContent: 'center', marginTop: spacing.xl },
   footerText: { ...typography.body, color: colors.textSecondary },
   footerLink: { ...typography.body, color: colors.accent, fontWeight: '700' },
 })

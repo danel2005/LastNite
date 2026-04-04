@@ -1,3 +1,13 @@
+/**
+ * Verify Screen
+ *
+ * Handles two modes:
+ *   - mode="signup"  → verify phone after account creation, then sign in
+ *   - mode="reset"   → verify phone for password reset, then go to reset-password
+ *
+ * Params: phone, mode ('signup' | 'reset')
+ */
+
 import { useState, useRef } from 'react'
 import {
   View,
@@ -8,7 +18,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Alert,
 } from 'react-native'
 import { router, useLocalSearchParams } from 'expo-router'
 import { colors, spacing, borderRadius, typography } from '@/lib/design'
@@ -16,41 +25,63 @@ import { apiClient } from '@/lib/api-client'
 import { useAuthStore } from '@/stores/auth-store'
 import type { User, Profile } from '@lastnite/shared'
 
+type Mode = 'signup' | 'reset'
+
 export default function VerifyScreen() {
-  const { phone } = useLocalSearchParams<{ phone: string }>()
-  const [otp, setOtp] = useState('')
-  const [loading, setLoading] = useState(false)
+  const { phone, mode = 'signup' } = useLocalSearchParams<{ phone: string; mode: Mode }>()
+  const [otp, setOtp]           = useState('')
+  const [loading, setLoading]   = useState(false)
   const [resending, setResending] = useState(false)
-  const inputRef = useRef<TextInput>(null)
-  const setSession = useAuthStore((s) => s.setSession)
+  const [error, setError]       = useState<string | null>(null)
+  const inputRef                = useRef<TextInput>(null)
+  const setSession              = useAuthStore((s) => s.setSession)
+
+  const isReset  = mode === 'reset'
+  const titleText  = isReset ? 'Reset your password' : 'Verify your number'
+  const subtitleText = isReset
+    ? 'Enter the code we sent to reset your password.'
+    : 'Enter the code we sent to complete signup.'
 
   async function handleVerify() {
-    if (otp.length < 4) {
-      Alert.alert('Enter the code', 'The verification code is 6 digits.')
+    if (otp.length < 6) {
+      setError('The verification code is 6 digits.')
       return
     }
     setLoading(true)
+    setError(null)
     try {
-      const res = await apiClient.post('/auth/verify-otp', { phone, token: otp, type: 'sms' })
-      const data = res.data as {
-        session: { accessToken: string }
-        user: { id: string; phone: string | null; email: string | null }
-        profile: Profile | null
-      }
-      const now = new Date().toISOString()
-      const user: User = { id: data.user.id, phone: data.user.phone ?? null, email: data.user.email ?? null, createdAt: now, updatedAt: now }
-      await setSession(user, data.profile, data.session.accessToken)
-
-      if (!data.profile?.displayName) {
-        router.replace('/(auth)/profile-setup')
+      if (isReset) {
+        // For reset: verify OTP, then navigate to reset-password with the session token
+        const res = await apiClient.post('/auth/verify-reset', { phone, token: otp })
+        const data = res.data as { resetToken: string }
+        router.replace({
+          pathname: '/(auth)/reset-password' as never,
+          params: { phone, resetToken: data.resetToken },
+        })
       } else {
-        router.replace('/(app)/')
+        // For signup: verify OTP → returns session → log user in
+        const res = await apiClient.post('/auth/verify-signup', { phone, token: otp })
+        const data = res.data as {
+          session: { accessToken: string }
+          user: { id: string; phone: string | null; email: string | null }
+          profile: Profile | null
+        }
+        const now = new Date().toISOString()
+        const user: User = {
+          id: data.user.id,
+          phone: data.user.phone ?? null,
+          email: data.user.email ?? null,
+          createdAt: now,
+          updatedAt: now,
+        }
+        await setSession(user, data.profile, data.session.accessToken)
+        router.replace('/(auth)/profile-setup')
       }
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
-        'Invalid code. Try again.'
-      Alert.alert('Invalid code', msg)
+        'Invalid or expired code. Please try again.'
+      setError(msg)
       setOtp('')
       inputRef.current?.focus()
     } finally {
@@ -61,11 +92,15 @@ export default function VerifyScreen() {
   async function handleResend() {
     if (!phone) return
     setResending(true)
+    setError(null)
     try {
-      await apiClient.post('/auth/request-otp', { phone })
-      Alert.alert('Code sent!', `A new code was sent to ${phone}`)
+      if (isReset) {
+        await apiClient.post('/auth/forgot-password', { phone })
+      } else {
+        await apiClient.post('/auth/resend-signup-otp', { phone })
+      }
     } catch {
-      Alert.alert('Error', 'Failed to resend code.')
+      setError('Failed to resend code. Try again in a moment.')
     } finally {
       setResending(false)
     }
@@ -74,25 +109,24 @@ export default function VerifyScreen() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.root}
+      style={s.root}
     >
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Check your texts</Text>
-          <Text style={styles.subtitle}>
-            We sent a 6-digit code to{'\n'}
-            <Text style={styles.phone}>{phone}</Text>
-          </Text>
+      <View style={s.container}>
+        <View style={s.header}>
+          <Text style={s.title}>{titleText}</Text>
+          <Text style={s.subtitle}>{subtitleText}</Text>
+          <Text style={s.phone}>{phone}</Text>
         </View>
 
-        <View style={styles.form}>
-          <Text style={styles.label}>Verification code</Text>
+        <View style={s.form}>
+          <Text style={s.label}>Verification code</Text>
           <TextInput
             ref={inputRef}
-            style={styles.input}
+            style={[s.input, error ? s.inputError : null]}
             value={otp}
             onChangeText={(v) => {
               setOtp(v.replace(/\D/g, '').slice(0, 6))
+              setError(null)
             }}
             placeholder="000000"
             placeholderTextColor={colors.textTertiary}
@@ -103,30 +137,33 @@ export default function VerifyScreen() {
             onSubmitEditing={handleVerify}
             editable={!loading}
           />
+          {error && <Text style={s.errorText}>{error}</Text>}
 
           <TouchableOpacity
-            style={[styles.button, (loading || otp.length < 6) && styles.buttonDisabled]}
+            style={[s.button, (loading || otp.length < 6) && s.buttonDisabled]}
             onPress={handleVerify}
             disabled={loading || otp.length < 6}
             activeOpacity={0.8}
           >
             {loading ? (
-              <ActivityIndicator color={colors.bg} />
+              <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.buttonText}>Verify →</Text>
+              <Text style={s.buttonText}>
+                {isReset ? 'Verify & continue →' : 'Verify →'}
+              </Text>
             )}
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={handleResend} disabled={resending} style={styles.resendRow}>
+          <TouchableOpacity onPress={handleResend} disabled={resending} style={s.resendRow}>
             {resending ? (
               <ActivityIndicator color={colors.textSecondary} size="small" />
             ) : (
-              <Text style={styles.resendText}>Didn't get a code? Resend</Text>
+              <Text style={s.resendText}>Didn't get a code? Resend</Text>
             )}
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={() => router.back()} style={styles.backRow}>
-            <Text style={styles.backText}>← Change number</Text>
+          <TouchableOpacity onPress={() => router.back()} style={s.backRow}>
+            <Text style={s.backText}>← Go back</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -134,36 +171,14 @@ export default function VerifyScreen() {
   )
 }
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: colors.bg,
-  },
-  container: {
-    flex: 1,
-    paddingHorizontal: spacing.lg,
-    justifyContent: 'center',
-  },
-  header: {
-    marginBottom: spacing.xxl,
-  },
-  title: {
-    ...typography.heading2,
-    color: colors.text,
-    marginBottom: spacing.sm,
-  },
-  subtitle: {
-    ...typography.body,
-    color: colors.textSecondary,
-    lineHeight: 26,
-  },
-  phone: {
-    color: colors.accent,
-    fontWeight: '700',
-  },
-  form: {
-    gap: spacing.sm,
-  },
+const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.bg },
+  container: { flex: 1, paddingHorizontal: spacing.lg, justifyContent: 'center' },
+  header: { marginBottom: spacing.xxl },
+  title: { ...typography.heading2, color: colors.text, marginBottom: spacing.sm },
+  subtitle: { ...typography.body, color: colors.textSecondary, lineHeight: 24 },
+  phone: { ...typography.body, color: colors.accent, fontWeight: '700', marginTop: 4 },
+  form: { gap: spacing.sm },
   label: {
     ...typography.label,
     color: colors.textSecondary,
@@ -184,6 +199,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontWeight: '700',
   },
+  inputError: { borderColor: colors.error },
+  errorText: { color: colors.error, fontSize: 13, textAlign: 'center', marginTop: 4 },
   button: {
     backgroundColor: colors.accent,
     borderRadius: borderRadius.md,
@@ -191,31 +208,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: spacing.lg,
   },
-  buttonDisabled: {
-    opacity: 0.4,
-  },
-  buttonText: {
-    color: colors.bg,
-    fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  resendRow: {
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-    marginTop: spacing.sm,
-  },
-  resendText: {
-    ...typography.bodySmall,
-    color: colors.textSecondary,
-    textDecorationLine: 'underline',
-  },
-  backRow: {
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-  },
-  backText: {
-    ...typography.bodySmall,
-    color: colors.textTertiary,
-  },
+  buttonDisabled: { opacity: 0.4 },
+  buttonText: { color: '#fff', fontSize: 16, fontWeight: '700', letterSpacing: 0.5 },
+  resendRow: { alignItems: 'center', paddingVertical: spacing.sm, marginTop: spacing.sm },
+  resendText: { ...typography.bodySmall, color: colors.textSecondary, textDecorationLine: 'underline' },
+  backRow: { alignItems: 'center', paddingVertical: spacing.sm },
+  backText: { ...typography.bodySmall, color: colors.textTertiary },
 })

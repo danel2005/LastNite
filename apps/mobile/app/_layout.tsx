@@ -94,15 +94,17 @@ export default function RootLayout() {
     <AppErrorBoundary>
       <GestureHandlerRootView style={styles.root}>
         <QueryClientProvider client={queryClient}>
-          <StatusBar style="light" />
+          <StatusBar style="light" backgroundColor={colors.bg} />
           <Stack
-          screenOptions={{
-            headerStyle: { backgroundColor: '#0A0A0A' },
-            headerTintColor: '#FFFFFF',
-            headerTitleStyle: { fontWeight: '700' },
-            contentStyle: { backgroundColor: '#0A0A0A' },
-          }}
-        >
+            screenOptions={{
+              headerStyle: { backgroundColor: colors.bg },
+              headerTintColor: colors.text,
+              headerTitleStyle: { fontWeight: '700', color: colors.text },
+              headerShadowVisible: false,
+              headerBackTitleVisible: false,
+              contentStyle: { backgroundColor: colors.bg },
+            }}
+          >
             <Stack.Screen name="(auth)" options={{ headerShown: false }} />
             <Stack.Screen name="(app)" options={{ headerShown: false }} />
           </Stack>
