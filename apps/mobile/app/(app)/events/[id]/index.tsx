@@ -1,11 +1,12 @@
 /**
  * Live Event Dashboard
  *
- * The main screen during a live event. Shows:
+ * The main screen during a live event. Redesigned to match the LastNite UI.
+ * Shows:
+ *   - Event title + LIVE badge + countdown
  *   - Mission card (current active mission or waiting state)
- *   - Time remaining in event
- *   - Participant activity dots
- *   - Recent feed preview strip
+ *   - Participant activity strip
+ *   - Feed CTA
  *   - Host controls (host only)
  *
  * Polls GET /events/:id/live every 30s (10s when mission is expiring).
@@ -21,7 +22,9 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
+  Animated,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { router, useLocalSearchParams } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { colors, spacing, borderRadius, typography, shadows } from '@/lib/design'
@@ -107,204 +110,289 @@ function formatTime(ms: number): string {
   return `${mins}:${secs.toString().padStart(2, '0')}`
 }
 
+// ─── Live pulse dot ───────────────────────────────────────────────────────────
+
+function LiveDot() {
+  const scale = useRef(new Animated.Value(1)).current
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(scale, { toValue: 1.5, duration: 600, useNativeDriver: true }),
+        Animated.timing(scale, { toValue: 1, duration: 600, useNativeDriver: true }),
+      ]),
+    ).start()
+  }, [scale])
+  return (
+    <View style={ld.wrap}>
+      <Animated.View style={[ld.ring, { transform: [{ scale }] }]} />
+      <View style={ld.dot} />
+    </View>
+  )
+}
+
+const ld = StyleSheet.create({
+  wrap: { width: 10, height: 10, alignItems: 'center', justifyContent: 'center' },
+  ring: {
+    position: 'absolute',
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.error,
+    opacity: 0.35,
+  },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.error },
+})
+
 // ─── Mission Card ─────────────────────────────────────────────────────────────
 
-function MissionCard({ mission, onComplete }: { mission: LiveMission | null; onComplete: (id: string) => void }) {
+function MissionCard({
+  mission,
+  onComplete,
+}: {
+  mission: LiveMission | null
+  onComplete: (id: string) => void
+}) {
   const timeUntilExpiry = useCountdown(
     mission ? Math.max(0, new Date(mission.expiresAt).getTime() - Date.now()) : 0,
   )
 
   if (!mission) {
     return (
-      <View style={[missionStyles.card, missionStyles.waitingCard]}>
-        <Text style={missionStyles.waitingEmoji}>⌛</Text>
-        <Text style={missionStyles.waitingTitle}>Waiting for your next mission...</Text>
-        <Text style={missionStyles.waitingHint}>Missions arrive every {30} minutes</Text>
+      <View style={mc.card}>
+        <View style={mc.glowOrb} />
+        <Text style={mc.waitEmoji}>⌛</Text>
+        <Text style={mc.waitTitle}>Waiting for your next mission...</Text>
+        <Text style={mc.waitHint}>Missions arrive on a timer</Text>
       </View>
     )
   }
 
   if (mission.hasSubmission || mission.status === 'completed') {
     return (
-      <View style={[missionStyles.card, missionStyles.completedCard]}>
-        <Text style={missionStyles.completedEmoji}>✅</Text>
-        <Text style={missionStyles.completedTitle}>Mission complete!</Text>
-        <Text style={missionStyles.completedMission} numberOfLines={2}>
+      <View style={[mc.card, mc.completedCard]}>
+        <View style={[mc.glowOrb, mc.glowGreen]} />
+        <Text style={mc.waitEmoji}>✅</Text>
+        <Text style={[mc.waitTitle, { color: colors.success }]}>Mission complete!</Text>
+        <Text style={mc.completedName} numberOfLines={2}>
           {mission.isSecret ? '🔒 Secret mission' : mission.mission.title}
         </Text>
-        <Text style={missionStyles.waitingHint}>Next mission coming...</Text>
+        <Text style={mc.waitHint}>Next mission incoming...</Text>
       </View>
     )
   }
 
   if (mission.status === 'expired') {
     return (
-      <View style={[missionStyles.card, missionStyles.expiredCard]}>
-        <Text style={missionStyles.completedEmoji}>💨</Text>
-        <Text style={missionStyles.completedTitle}>Missed that one</Text>
-        <Text style={missionStyles.waitingHint}>Next mission on its way</Text>
+      <View style={[mc.card, { opacity: 0.6 }]}>
+        <Text style={mc.waitEmoji}>💨</Text>
+        <Text style={mc.waitTitle}>Missed that one</Text>
+        <Text style={mc.waitHint}>Next mission on its way</Text>
       </View>
     )
   }
 
-  const isExpiringSoon = timeUntilExpiry < 3 * 60_000 // < 3min
+  const isExpiringSoon = timeUntilExpiry < 3 * 60_000
   const isSecret = mission.isSecret
 
   return (
-    <View style={[missionStyles.card, isSecret && missionStyles.secretCard]}>
+    <View style={[mc.card, isSecret && mc.secretCard]}>
+      <View style={[mc.glowOrb, isSecret && mc.glowSecret]} />
+
       {isSecret && (
-        <View style={missionStyles.secretBanner}>
-          <Text style={missionStyles.secretBannerText}>🔒 Shhh... this is a secret mission!</Text>
+        <View style={mc.secretBanner}>
+          <Text style={mc.secretBannerText}>🔒 Shhh... Secret Mission</Text>
         </View>
       )}
 
-      <View style={missionStyles.cardHeader}>
-        <Text style={missionStyles.mediaTypeTag}>
-          {mission.mission.mediaType === 'photo' ? '📸 Photo' :
-           mission.mission.mediaType === 'video' ? '🎥 Video' : '✨ Photo or Video'}
-        </Text>
-        <View style={[missionStyles.timerBadge, isExpiringSoon && missionStyles.timerBadgeUrgent]}>
-          <Text style={[missionStyles.timerText, isExpiringSoon && missionStyles.timerTextUrgent]}>
+      <View style={mc.headerRow}>
+        <View style={mc.mediaTag}>
+          <Text style={mc.mediaTagText}>
+            {mission.mission.mediaType === 'photo' ? '📸 Photo' :
+             mission.mission.mediaType === 'video' ? '🎥 Video' : '✨ Any'}
+          </Text>
+        </View>
+        <View style={[mc.timerBadge, isExpiringSoon && mc.timerBadgeUrgent]}>
+          <Text style={[mc.timerText, isExpiringSoon && mc.timerTextUrgent]}>
             {formatTime(timeUntilExpiry)}
           </Text>
         </View>
       </View>
 
-      <Text style={[missionStyles.missionTitle, isSecret && missionStyles.secretTitle]}>
+      <Text style={[mc.title, isSecret && mc.secretTitle]}>
         {isSecret ? '???' : mission.mission.title}
       </Text>
 
       {!isSecret && mission.mission.description !== mission.mission.title && (
-        <Text style={missionStyles.missionDesc}>{mission.mission.description}</Text>
+        <Text style={mc.desc}>{mission.mission.description}</Text>
+      )}
+
+      {!isSecret && mission.mission.intensity > 0 && (
+        <View style={mc.intensityRow}>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <View
+              key={i}
+              style={[mc.intensityDot, i < mission.mission.intensity && mc.intensityDotFilled]}
+            />
+          ))}
+          <Text style={mc.intensityLabel}>intensity</Text>
+        </View>
       )}
 
       <TouchableOpacity
-        style={[missionStyles.completeBtn, isSecret && missionStyles.completeBtnSecret]}
+        style={[mc.btn, isSecret && mc.btnSecret]}
         onPress={() => onComplete(mission.assignmentId)}
         activeOpacity={0.85}
       >
-        <Text style={missionStyles.completeBtnText}>Complete Mission →</Text>
+        <Text style={mc.btnText}>Complete Mission →</Text>
       </TouchableOpacity>
     </View>
   )
 }
 
-const missionStyles = StyleSheet.create({
+const mc = StyleSheet.create({
   card: {
-    backgroundColor: colors.bgCard,
+    backgroundColor: colors.bgElevated,
     borderRadius: borderRadius.xl,
     padding: spacing.lg,
-    gap: spacing.sm,
-    ...shadows.card,
+    gap: spacing.md,
     borderWidth: 1,
     borderColor: colors.border,
+    overflow: 'hidden',
+    ...shadows.card,
   },
-  waitingCard: {
-    alignItems: 'center',
-    paddingVertical: spacing.xxl,
+  glowOrb: {
+    position: 'absolute',
+    right: -50,
+    bottom: -50,
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: colors.primary,
+    opacity: 0.06,
   },
-  secretCard: {
-    borderColor: colors.secret,
-    backgroundColor: colors.secretSubtle,
-  },
-  completedCard: {
-    alignItems: 'center',
-    borderColor: colors.success,
-    paddingVertical: spacing.xl,
-  },
-  expiredCard: {
-    alignItems: 'center',
-    opacity: 0.6,
-    paddingVertical: spacing.xl,
-  },
-  waitingEmoji: { fontSize: 40, marginBottom: spacing.sm },
-  waitingTitle: { ...typography.heading3, color: colors.textSecondary, textAlign: 'center' },
-  waitingHint: { ...typography.bodySmall, color: colors.textTertiary, textAlign: 'center' },
-  completedEmoji: { fontSize: 40, marginBottom: spacing.sm },
-  completedTitle: { ...typography.heading3, color: colors.success },
-  completedMission: { ...typography.body, color: colors.textSecondary, textAlign: 'center' },
+  glowGreen: { backgroundColor: colors.success },
+  glowSecret: { backgroundColor: colors.secret },
+  completedCard: { borderColor: colors.success },
+  secretCard: { borderColor: colors.secret, backgroundColor: 'rgba(168, 85, 247, 0.08)' },
+  waitEmoji: { fontSize: 44, textAlign: 'center', marginTop: spacing.md },
+  waitTitle: { ...typography.heading3, color: colors.textSecondary, textAlign: 'center' },
+  waitHint: { ...typography.bodySmall, color: colors.textTertiary, textAlign: 'center' },
+  completedName: { ...typography.body, color: colors.textSecondary, textAlign: 'center' },
   secretBanner: {
     backgroundColor: colors.secret,
     borderRadius: borderRadius.sm,
     paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
+    paddingVertical: 5,
     alignSelf: 'flex-start',
   },
-  secretBannerText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  secretBannerText: { color: '#fff', fontSize: 12, fontWeight: '800' },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  mediaTag: {
+    backgroundColor: colors.bgHighest,
+    borderRadius: borderRadius.full,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
   },
-  mediaTypeTag: {
-    ...typography.label,
-    color: colors.textSecondary,
-  },
+  mediaTagText: { color: colors.textSecondary, fontSize: 12, fontWeight: '600' },
   timerBadge: {
-    backgroundColor: colors.bgElevated,
+    backgroundColor: colors.bgHighest,
     borderRadius: borderRadius.sm,
     paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  timerBadgeUrgent: { backgroundColor: colors.error },
-  timerText: { color: colors.textSecondary, fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  timerTextUrgent: { color: '#FFFFFF' },
-  missionTitle: { ...typography.heading2, color: colors.text },
-  secretTitle: { color: colors.secret, fontSize: 28, textAlign: 'center', paddingVertical: spacing.md },
-  missionDesc: { ...typography.body, color: colors.textSecondary },
-  completeBtn: {
-    backgroundColor: colors.accent,
+  timerBadgeUrgent: { backgroundColor: colors.error, borderColor: colors.error },
+  timerText: { color: colors.textSecondary, fontSize: 14, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  timerTextUrgent: { color: '#fff' },
+  title: { ...typography.heading2, color: colors.text, lineHeight: 30 },
+  secretTitle: { color: colors.secret, textAlign: 'center', fontSize: 32 },
+  desc: { ...typography.body, color: colors.textSecondary, lineHeight: 22 },
+  intensityRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  intensityDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.bgHighest,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  intensityDotFilled: { backgroundColor: colors.primary, borderColor: colors.primary },
+  intensityLabel: { color: colors.textTertiary, fontSize: 10, fontWeight: '600', marginLeft: 4, textTransform: 'uppercase', letterSpacing: 0.8 },
+  btn: {
+    backgroundColor: colors.primary,
     borderRadius: borderRadius.md,
     paddingVertical: spacing.md,
     alignItems: 'center',
-    marginTop: spacing.sm,
+    marginTop: spacing.xs,
+    ...shadows.glow,
   },
-  completeBtnSecret: { backgroundColor: colors.secret },
-  completeBtnText: { color: colors.bg, fontSize: 16, fontWeight: '700' },
+  btnSecret: { backgroundColor: colors.secret, shadowColor: colors.secret },
+  btnText: { color: colors.bg, fontSize: 16, fontWeight: '800' },
 })
 
-// ─── Activity Dots ────────────────────────────────────────────────────────────
+// ─── Participant strip ────────────────────────────────────────────────────────
 
-function ActivityDots({ participants, currentUserId }: { participants: ParticipantActivity[]; currentUserId: string | undefined }) {
+function ParticipantStrip({
+  participants,
+  currentUserId,
+}: {
+  participants: ParticipantActivity[]
+  currentUserId: string | undefined
+}) {
   return (
-    <View style={activityStyles.row}>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={ps.row}>
       {participants.map((p) => (
-        <View key={p.userId} style={activityStyles.dot}>
+        <View key={p.userId} style={ps.item}>
           <View style={[
-            activityStyles.avatar,
-            p.isOnline && activityStyles.avatarOnline,
-            p.userId === currentUserId && activityStyles.avatarSelf,
+            ps.avatar,
+            p.isOnline && ps.avatarOnline,
+            p.userId === currentUserId && ps.avatarSelf,
           ]}>
-            <Text style={activityStyles.avatarText}>
-              {p.displayName[0]?.toUpperCase() ?? '?'}
-            </Text>
+            <Text style={ps.avatarText}>{p.displayName[0]?.toUpperCase() ?? '?'}</Text>
+            {p.submissionCount > 0 && (
+              <View style={ps.badge}>
+                <Text style={ps.badgeText}>{p.submissionCount}</Text>
+              </View>
+            )}
           </View>
-          {p.submissionCount > 0 && (
-            <Text style={activityStyles.count}>{p.submissionCount}</Text>
-          )}
+          <Text style={ps.name} numberOfLines={1}>{p.displayName.split(' ')[0]}</Text>
         </View>
       ))}
-    </View>
+    </ScrollView>
   )
 }
 
-const activityStyles = StyleSheet.create({
-  row: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  dot: { alignItems: 'center', gap: 2 },
+const ps = StyleSheet.create({
+  row: { gap: spacing.md, paddingRight: spacing.lg },
+  item: { alignItems: 'center', gap: 5, width: 48 },
   avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.bgElevated,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.bgHighest,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
     borderColor: colors.border,
   },
   avatarOnline: { borderColor: colors.success },
-  avatarSelf: { borderColor: colors.accent },
-  avatarText: { color: colors.textSecondary, fontSize: 14, fontWeight: '700' },
-  count: { ...typography.label, color: colors.accent, fontSize: 10 },
+  avatarSelf: { borderColor: colors.primary },
+  avatarText: { color: colors.textSecondary, fontSize: 16, fontWeight: '800' },
+  badge: {
+    position: 'absolute',
+    top: -3,
+    right: -3,
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.full,
+    minWidth: 16,
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  badgeText: { color: colors.bg, fontSize: 9, fontWeight: '900' },
+  name: { color: colors.textTertiary, fontSize: 10, fontWeight: '600', textAlign: 'center' },
 })
 
 // ─── Host Panel ───────────────────────────────────────────────────────────────
@@ -330,68 +418,54 @@ function HostPanel({ data, eventId }: { data: LiveEventData['hostData']; eventId
   const pct = total > 0 ? Math.round((completed / total) * 100) : 0
 
   return (
-    <View style={hostStyles.panel}>
-      <Text style={hostStyles.title}>Host View</Text>
-      <Text style={hostStyles.stat}>Overall completion: {pct}% ({completed}/{total})</Text>
+    <View style={hp.panel}>
+      <View style={hp.headerRow}>
+        <Text style={hp.title}>HOST</Text>
+        <Text style={hp.stat}>{pct}% complete ({completed}/{total})</Text>
+      </View>
+      <View style={hp.progressTrack}>
+        <View style={[hp.progressFill, { width: `${pct}%` as any }]} />
+      </View>
       <TouchableOpacity
-        style={[hostStyles.triggerButton, triggerMutation.isPending && hostStyles.disabled]}
+        style={[hp.btn, triggerMutation.isPending && hp.btnDisabled]}
         onPress={() => triggerMutation.mutate()}
         disabled={triggerMutation.isPending}
       >
         {triggerMutation.isPending ? (
           <ActivityIndicator color={colors.bg} size="small" />
         ) : (
-          <Text style={hostStyles.triggerText}>⚡ Trigger group mission</Text>
+          <Text style={hp.btnText}>⚡ Trigger Group Mission</Text>
         )}
       </TouchableOpacity>
     </View>
   )
 }
 
-const hostStyles = StyleSheet.create({
+const hp = StyleSheet.create({
   panel: {
-    backgroundColor: colors.bgCard,
+    backgroundColor: colors.bgElevated,
     borderRadius: borderRadius.lg,
     padding: spacing.md,
     gap: spacing.sm,
     borderWidth: 1,
-    borderColor: colors.accentSubtle,
+    borderColor: 'rgba(204, 151, 255, 0.25)',
   },
-  title: { ...typography.label, color: colors.accent, textTransform: 'uppercase', letterSpacing: 1 },
-  stat: { ...typography.body, color: colors.textSecondary },
-  triggerButton: {
-    backgroundColor: colors.accent,
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  title: { color: colors.primary, fontSize: 11, fontWeight: '800', letterSpacing: 1.2 },
+  stat: { color: colors.textSecondary, fontSize: 13 },
+  progressTrack: { height: 4, backgroundColor: colors.bgHighest, borderRadius: borderRadius.full, overflow: 'hidden' },
+  progressFill: { height: '100%', backgroundColor: colors.primary, borderRadius: borderRadius.full },
+  btn: {
+    backgroundColor: colors.primary,
     borderRadius: borderRadius.md,
     paddingVertical: spacing.sm,
     alignItems: 'center',
   },
-  triggerText: { color: colors.bg, fontSize: 14, fontWeight: '700' },
-  disabled: { opacity: 0.5 },
+  btnText: { color: colors.bg, fontSize: 14, fontWeight: '800' },
+  btnDisabled: { opacity: 0.5 },
 })
 
-// ─── Offline Banner ───────────────────────────────────────────────────────────
-
-function OfflineBanner() {
-  return (
-    <View style={offSt.banner}>
-      <Text style={offSt.text}>📡 No connection — waiting to reconnect...</Text>
-    </View>
-  )
-}
-
-const offSt = StyleSheet.create({
-  banner: {
-    backgroundColor: colors.bgElevated,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    alignItems: 'center',
-  },
-  text: { ...typography.label, color: colors.textSecondary },
-})
-
-// ─── Main Screen ──────────────────────────────────────────────────────────────
+// ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function LiveEventScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
@@ -406,14 +480,12 @@ export default function LiveEventScreen() {
     refetchInterval: () => pollIntervalRef.current,
   })
 
-  // Update poll interval based on server hint
   useEffect(() => {
     if (data?.pollHint?.intervalMs) {
       pollIntervalRef.current = data.pollHint.intervalMs
     }
   }, [data?.pollHint?.intervalMs])
 
-  // Redirect if event state changes
   useEffect(() => {
     const state = data?.event.state
     if (state === 'completed' || state === 'archived') {
@@ -428,27 +500,34 @@ export default function LiveEventScreen() {
 
   if (isLoading || isPending) {
     return (
-      <View style={s.centered}>
-        <ActivityIndicator color={colors.accent} size="large" />
-      </View>
+      <SafeAreaView style={s.safe} edges={['top']}>
+        <View style={s.centered}>
+          <ActivityIndicator color={colors.primary} size="large" />
+        </View>
+      </SafeAreaView>
     )
   }
 
   if (isError && !data) {
     return (
-      <View style={s.centered}>
-        <Text style={s.errorText}>Failed to load event.</Text>
-        <TouchableOpacity onPress={() => qc.invalidateQueries({ queryKey: ['live', id] })}>
-          <Text style={s.retryText}>Retry</Text>
-        </TouchableOpacity>
-      </View>
+      <SafeAreaView style={s.safe} edges={['top']}>
+        <View style={s.centered}>
+          <Text style={s.errorText}>Failed to load event.</Text>
+          <TouchableOpacity
+            onPress={() => qc.invalidateQueries({ queryKey: ['live', id] })}
+            style={s.retryBtn}
+          >
+            <Text style={s.retryText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
     )
   }
 
-  // Pick the most relevant active mission (newest non-completed)
-  const activeMission = data.myMissions.find(
-    (m) => m.status === 'active' && !m.hasSubmission,
-  ) ?? data.myMissions[0] ?? null
+  const activeMission =
+    data.myMissions.find((m) => m.status === 'active' && !m.hasSubmission) ??
+    data.myMissions[0] ??
+    null
 
   function handleCompleteMission(assignmentId: string) {
     const mediaType = activeMission?.mission.mediaType ?? 'any'
@@ -458,15 +537,24 @@ export default function LiveEventScreen() {
   }
 
   return (
-    <>
-      {/* Offline banner — shown when we have cached data but fetch is failing */}
-      {isError && data && <OfflineBanner />}
-      <ScrollView style={s.root} contentContainerStyle={s.content}>
-        {/* Event title + time remaining */}
+    <SafeAreaView style={s.safe} edges={['top']}>
+      {isError && data && (
+        <View style={s.offlineBanner}>
+          <Text style={s.offlineText}>📡 Reconnecting...</Text>
+        </View>
+      )}
+
+      {/* Top bar */}
       <View style={s.topBar}>
-        <View style={s.topBarLeft}>
+        <TouchableOpacity onPress={() => router.back()} style={s.backBtn} activeOpacity={0.7}>
+          <Text style={s.backText}>←</Text>
+        </TouchableOpacity>
+        <View style={s.topCenter}>
           <Text style={s.eventTitle} numberOfLines={1}>{data.event.title}</Text>
-          <Text style={s.liveTag}>● LIVE</Text>
+          <View style={s.liveRow}>
+            <LiveDot />
+            <Text style={s.liveText}>LIVE</Text>
+          </View>
         </View>
         <View style={s.timerBlock}>
           <Text style={s.timerLabel}>ends in</Text>
@@ -474,100 +562,124 @@ export default function LiveEventScreen() {
         </View>
       </View>
 
-      {/* Mission card */}
-      <MissionCard mission={activeMission} onComplete={handleCompleteMission} />
+      <ScrollView
+        style={s.scroll}
+        contentContainerStyle={s.content}
+        showsVerticalScrollIndicator={false}
+      >
+        <MissionCard mission={activeMission} onComplete={handleCompleteMission} />
 
-      {/* My mission history (completed/expired ones) */}
-      {data.myMissions.length > 1 && (
-        <View style={s.missionHistory}>
-          <Text style={s.sectionLabel}>My missions</Text>
-          {data.myMissions.slice(1).map((m) => (
-            <View key={m.assignmentId} style={s.historyItem}>
-              <Text style={[s.historyStatus,
-                m.status === 'completed' ? { color: colors.success } :
-                m.status === 'expired' ? { color: colors.textTertiary } :
-                { color: colors.accent }
-              ]}>
-                {m.status === 'completed' ? '✅' : m.status === 'expired' ? '💨' : '•'}
-              </Text>
-              <Text style={s.historyTitle} numberOfLines={1}>
-                {m.isSecret ? '🔒 Secret mission' : m.mission.title}
-              </Text>
-            </View>
-          ))}
+        {data.myMissions.length > 1 && (
+          <View style={s.section}>
+            <Text style={s.sectionLabel}>My missions</Text>
+            {data.myMissions.slice(1).map((m) => (
+              <View key={m.assignmentId} style={s.historyRow}>
+                <Text style={[
+                  s.historyIcon,
+                  m.status === 'completed' ? { color: colors.success } :
+                  m.status === 'expired' ? { color: colors.textTertiary } :
+                  { color: colors.primary },
+                ]}>
+                  {m.status === 'completed' ? '✅' : m.status === 'expired' ? '💨' : '•'}
+                </Text>
+                <Text style={s.historyTitle} numberOfLines={1}>
+                  {m.isSecret ? '🔒 Secret mission' : m.mission.title}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        <View style={s.section}>
+          <Text style={s.sectionLabel}>Participants ({data.participants.length})</Text>
+          <ParticipantStrip participants={data.participants} currentUserId={userId} />
         </View>
-      )}
 
-      {/* Activity dots */}
-      <View style={s.section}>
-        <Text style={s.sectionLabel}>Participants ({data.participants.length})</Text>
-        <ActivityDots participants={data.participants} currentUserId={userId} />
-      </View>
+        <TouchableOpacity
+          style={s.feedBtn}
+          onPress={() => router.push(`/(app)/events/${id}/feed` as never)}
+          activeOpacity={0.8}
+        >
+          <Text style={s.feedBtnText}>View Feed ✨</Text>
+        </TouchableOpacity>
 
-      {/* Feed preview CTA */}
-      <TouchableOpacity
-        style={s.feedButton}
-        onPress={() => router.push(`/(app)/events/${id}/feed` as never)}
-        activeOpacity={0.8}
-      >
-        <Text style={s.feedButtonText}>View feed →</Text>
-      </TouchableOpacity>
+        <View style={s.lockedBanner}>
+          <Text style={s.lockedText}>🔒 Mission creation locked during live event</Text>
+        </View>
 
-      {/* Custom mission button */}
-      <TouchableOpacity
-        style={s.customMissionButton}
-        onPress={() => router.push(`/(app)/events/${id}/create-mission` as never)}
-        activeOpacity={0.8}
-      >
-        <Text style={s.customMissionText}>+ Create custom mission</Text>
-      </TouchableOpacity>
-
-        {/* Host panel */}
         {data.hostData && <HostPanel data={data.hostData} eventId={id!} />}
+
+        <View style={{ height: spacing.xxl }} />
       </ScrollView>
-    </>
+    </SafeAreaView>
   )
 }
 
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg },
-  content: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md },
+  safe: { flex: 1, backgroundColor: colors.bg },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md },
   errorText: { ...typography.body, color: colors.error },
-  retryText: { ...typography.body, color: colors.accent },
-  topBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: spacing.sm,
-  },
-  topBarLeft: { flex: 1, gap: 3 },
-  eventTitle: { ...typography.heading2, color: colors.text },
-  liveTag: { ...typography.label, color: colors.success, fontWeight: '800' },
-  timerBlock: { alignItems: 'flex-end' },
-  timerLabel: { ...typography.label, color: colors.textTertiary, textTransform: 'uppercase' },
-  timer: { fontSize: 26, fontWeight: '900', color: colors.text, fontVariant: ['tabular-nums'] },
-  section: { gap: spacing.sm },
-  sectionLabel: { ...typography.label, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 1 },
-  missionHistory: { gap: spacing.xs },
-  historyItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: 3 },
-  historyStatus: { width: 20, textAlign: 'center' },
-  historyTitle: { ...typography.bodySmall, color: colors.textSecondary, flex: 1 },
-  feedButton: {
+  retryBtn: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: borderRadius.md,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
   },
-  feedButtonText: { color: colors.text, fontSize: 15, fontWeight: '600' },
-  customMissionButton: {
+  retryText: { color: colors.primary, fontSize: 15 },
+  offlineBanner: {
+    backgroundColor: colors.bgHighest,
+    paddingVertical: spacing.xs,
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  offlineText: { ...typography.label, color: colors.textSecondary },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    gap: spacing.sm,
+  },
+  backBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  backText: { color: colors.text, fontSize: 22, fontWeight: '400' },
+  topCenter: { flex: 1, alignItems: 'center', gap: 2 },
+  eventTitle: { ...typography.heading3, color: colors.text, fontSize: 17, textAlign: 'center' },
+  liveRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  liveText: { color: colors.error, fontSize: 10, fontWeight: '800', letterSpacing: 1.5 },
+  timerBlock: { alignItems: 'flex-end' },
+  timerLabel: { color: colors.textTertiary, fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 },
+  timer: { fontSize: 22, fontWeight: '900', color: colors.text, fontVariant: ['tabular-nums'] },
+  scroll: { flex: 1 },
+  content: { padding: spacing.lg, gap: spacing.md },
+  section: { gap: spacing.sm },
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+  },
+  historyRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: 3 },
+  historyIcon: { width: 22, textAlign: 'center', fontSize: 14 },
+  historyTitle: { ...typography.bodySmall, color: colors.textSecondary, flex: 1 },
+  feedBtn: {
     borderWidth: 1,
     borderColor: colors.border,
-    borderStyle: 'dashed',
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.sm + 2,
+    alignItems: 'center',
+    backgroundColor: colors.bgElevated,
+  },
+  feedBtnText: { color: colors.text, fontSize: 14, fontWeight: '700' },
+  lockedBanner: {
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
     borderRadius: borderRadius.md,
     paddingVertical: spacing.sm,
     alignItems: 'center',
+    backgroundColor: colors.bgCard,
   },
-  customMissionText: { color: colors.textSecondary, fontSize: 14 },
+  lockedText: { color: colors.textTertiary, fontSize: 12 },
 })
