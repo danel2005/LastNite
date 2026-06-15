@@ -13,6 +13,8 @@
     "dev:worker": "npm run dev:worker -w @lastnite/api",
     "dev:mobile": "npm run dev -w @lastnite/mobile -- --lan",
     "dev:phone": "bash scripts/dev-phone.sh",
+    "dev:qr": "bash scripts/phone-qr.sh",
+    "phone:qr": "npm run dev:qr",
     "dev:tunnel": "bash scripts/dev-tunnel.sh",
     "dev:all": "concurrently -n api,mobile -c blue,magenta \"npm:dev:api\" \"npm:dev:mobile\"",
     "mobile": "npm run dev:mobile",
