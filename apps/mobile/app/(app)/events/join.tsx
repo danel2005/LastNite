@@ -30,20 +30,23 @@ export default function JoinScreen() {
     setLoading(true)
     try {
       const res = await apiClient.post(`/invites/${cleaned}/join`)
-      const data = res.data as { event: Event; participant: unknown }
+      const data = res.data as { event: Event; participant: unknown; message?: string }
       await queryClient.invalidateQueries({ queryKey: ['events'] })
 
       const event = data.event
+      if (data.message === 'Already a participant') {
+        Alert.alert('Already in your events', `"${event.title}" is already in your event list.`)
+      }
       if (event.state === 'scheduled' || event.state === 'draft') {
         router.replace(`/(app)/events/${event.id}/lobby`)
       } else {
-        router.replace(`/(app)/events/${event.id}/`)
+        router.replace(`/(app)/events/${event.id}` as never)
       }
     } catch (err: unknown) {
       const status = (err as { response?: { status?: number } })?.response?.status
       const msg =
         status === 404 ? 'Invalid invite code. Check and try again.' :
-        status === 409 ? 'You\'re already in this event!' :
+        status === 409 ? 'This event cannot be joined right now.' :
         (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
         'Failed to join event.'
       Alert.alert('Couldn\'t join', msg)

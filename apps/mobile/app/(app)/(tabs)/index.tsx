@@ -333,7 +333,7 @@ const empty = StyleSheet.create({
 
 export default function HomeScreen() {
   const profile = useAuthStore((s) => s.profile)
-  const { data: events, isLoading, isError, refetch, isFetching } = useQuery({
+  const { data: events, isLoading, isError, refetch } = useQuery({
     queryKey: ['events'],
     queryFn: fetchMyEvents,
     refetchInterval: 30_000,

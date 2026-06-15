@@ -1,0 +1,47 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: lastnite-postgres
+    environment:
+      POSTGRES_USER: lastnite
+      POSTGRES_PASSWORD: lastnite
+      POSTGRES_DB: lastnite_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - lastnite-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lastnite -d lastnite_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgres_test:
+    image: postgres:16-alpine
+    container_name: lastnite-postgres-test
+    environment:
+      POSTGRES_USER: lastnite
+      POSTGRES_PASSWORD: lastnite
+      POSTGRES_DB: lastnite_test
+    ports:
+      - "5433:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lastnite -d lastnite_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: lastnite-redis
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - lastnite-redis:/data
+
+volumes:
+  lastnite-postgres:
+  lastnite-redis:

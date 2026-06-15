@@ -15,6 +15,8 @@ export const env = {
   NODE_ENV: optional('NODE_ENV', 'development'),
   PORT: Number(optional('PORT', '3001')),
   HOST: optional('HOST', '0.0.0.0'),
+  APP_ROLE: optional('APP_ROLE', 'api'),
+  RUN_BACKGROUND_JOBS: optional('RUN_BACKGROUND_JOBS', 'true') === 'true',
 
   DATABASE_URL: required('DATABASE_URL'),
 
@@ -23,6 +25,8 @@ export const env = {
   SUPABASE_JWT_SECRET: required('SUPABASE_JWT_SECRET'),
 
   REDIS_URL: optional('REDIS_URL', 'redis://localhost:6379'),
+  DEV_AUTH_OTP: process.env['DEV_AUTH_OTP'],
+  ADMIN_USER_IDS: optional('ADMIN_USER_IDS', ''),
 
   STORAGE_BUCKET_MEDIA: optional('STORAGE_BUCKET_MEDIA', 'event-media'),
 

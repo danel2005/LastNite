@@ -1,52 +1,52 @@
 // LastNite Design System
-// Matches the UI design files: deep midnight purple + lavender/fuchsia brand palette
+// Warm night palette: deeper neutral surfaces with coral, mint, and electric blue accents.
 
 // ─── Color Tokens ─────────────────────────────────────────────────────────────
 
 export const colors = {
   // Backgrounds
-  bg:                     '#0d0c1c',
-  bgCard:                 '#19172b',   // surface-container
-  bgElevated:             '#1f1d33',   // surface-container-high
-  bgHighest:              '#25233b',   // surface-container-highest
-  bgBright:               '#2b2943',   // surface-bright
-  bgInput:                '#19172b',
+  bg:                     '#08111f',
+  bgCard:                 '#111c2e',
+  bgElevated:             '#18263a',
+  bgHighest:              '#203149',
+  bgBright:               '#2b405c',
+  bgInput:                '#101b2b',
 
-  // Brand — lavender primary + fuchsia accent
-  primary:                '#cc97ff',   // lavender purple
-  primaryDim:             '#9c48ea',
-  primaryContainer:       '#c284ff',
-  onPrimary:              '#47007c',
+  // Brand
+  primary:                '#33d6c4',
+  primaryDim:             '#13a89b',
+  primaryContainer:       '#164f55',
+  onPrimary:              '#03201f',
 
-  accent:                 '#ec56fc',   // fuchsia/tertiary
-  accentDim:              '#f060ff',
-  accentSubtle:           'rgba(236, 86, 252, 0.15)',
+  accent:                 '#ff8a5b',
+  accentDim:              '#ffb15f',
+  accentSubtle:           'rgba(255, 138, 91, 0.16)',
 
-  // Secondary — indigo/blue-violet
-  secondary:              '#8a95ff',
-  secondaryContainer:     '#2f3aa3',
+  // Secondary
+  secondary:              '#5da8ff',
+  secondaryContainer:     '#173b68',
 
   // Text
-  text:                   '#e7e2fa',   // on-surface / on-background
-  textSecondary:          '#aca8bf',   // on-surface-variant
-  textTertiary:           '#767388',   // outline
+  text:                   '#f4f7fb',
+  textSecondary:          '#afbed1',
+  textTertiary:           '#738299',
 
   // Status
   success:                '#22C55E',
-  error:                  '#ff6e84',
-  warning:                '#FBBF24',
-  live:                   '#ff6e84',
+  error:                  '#ff5f7a',
+  warning:                '#ffd166',
+  live:                   '#ff5f7a',
 
   // Secret missions
-  secret:                 '#A855F7',
-  secretSubtle:           'rgba(168, 85, 247, 0.15)',
+  secret:                 '#c084fc',
+  secretSubtle:           'rgba(192, 132, 252, 0.15)',
 
   // Borders
-  border:                 '#484659',   // outline-variant
-  borderSubtle:           '#25233b',
+  border:                 '#304258',
+  borderSubtle:           '#1f3046',
 
   // Glass card (semi-transparent)
-  glass:                  'rgba(31, 29, 51, 0.6)',
+  glass:                  'rgba(17, 28, 46, 0.68)',
 
   // Utility
   overlay:                'rgba(0, 0, 0, 0.6)',
@@ -56,10 +56,10 @@ export const colors = {
 // ─── Gradient Pairs ───────────────────────────────────────────────────────────
 
 export const gradients = {
-  brand:    ['#cc97ff', '#ec56fc'] as const,  // signature lavender → fuchsia
-  night:    ['#0d0c1c', '#19172b'] as const,
+  brand:    ['#33d6c4', '#ff8a5b'] as const,
+  night:    ['#08111f', '#111c2e'] as const,
   live:     ['#16A34A', '#22C55E'] as const,
-  secret:   ['#7C3AED', '#A855F7'] as const,
+  secret:   ['#7C3AED', '#c084fc'] as const,
 } as const
 
 // ─── Spacing ──────────────────────────────────────────────────────────────────
@@ -87,9 +87,9 @@ export const borderRadius = {
 // ─── Typography ───────────────────────────────────────────────────────────────
 
 export const typography = {
-  heading1:  { fontSize: 36, fontWeight: '900' as const, letterSpacing: -1 },
-  heading2:  { fontSize: 24, fontWeight: '800' as const, letterSpacing: -0.5 },
-  heading3:  { fontSize: 20, fontWeight: '700' as const, letterSpacing: -0.2 },
+  heading1:  { fontSize: 36, fontWeight: '900' as const, letterSpacing: 0 },
+  heading2:  { fontSize: 24, fontWeight: '800' as const, letterSpacing: 0 },
+  heading3:  { fontSize: 20, fontWeight: '700' as const, letterSpacing: 0 },
   body:      { fontSize: 16, fontWeight: '400' as const, lineHeight: 24 },
   bodySmall: { fontSize: 14, fontWeight: '400' as const, lineHeight: 20 },
   label:     { fontSize: 11, fontWeight: '700' as const, letterSpacing: 0.8 },
@@ -107,14 +107,14 @@ export const shadows = {
     elevation: 8,
   },
   glow: {
-    shadowColor: '#cc97ff',
+    shadowColor: '#33d6c4',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.5,
     shadowRadius: 24,
     elevation: 10,
   },
   glowFuchsia: {
-    shadowColor: '#ec56fc',
+    shadowColor: '#ff8a5b',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.4,
     shadowRadius: 20,

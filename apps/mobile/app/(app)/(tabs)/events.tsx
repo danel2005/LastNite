@@ -14,7 +14,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  FlatList,
   RefreshControl,
   Dimensions,
 } from 'react-native'

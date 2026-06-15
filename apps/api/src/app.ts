@@ -15,6 +15,7 @@ import { feedRoutes } from './routes/feed.js'
 import { revealRoutes } from './routes/reveal.js'
 import { recapRoutes } from './routes/recap.js'
 import { exportRoutes, exportJobRoutes } from './routes/export.js'
+import { adminRoutes } from './routes/admin.js'
 import { startEventScheduler } from './lib/event-scheduler.js'
 import { startMissionWorker, stopMissionWorker } from './jobs/mission-worker.js'
 import { startRevealWorker, stopRevealWorker } from './jobs/reveal-worker.js'
@@ -22,7 +23,13 @@ import { startRecapWorker, stopRecapWorker } from './jobs/recap-worker.js'
 import { startExportWorker, stopExportWorker } from './jobs/export-worker.js'
 import { startNotificationWorker, stopNotificationWorker } from './jobs/notification-worker.js'
 
-export async function buildApp() {
+interface BuildAppOptions {
+  startBackgroundServices?: boolean
+}
+
+export async function buildApp(options: BuildAppOptions = {}) {
+  const startBackgroundServices = options.startBackgroundServices ?? env.RUN_BACKGROUND_JOBS
+
   const app = Fastify({
     logger: env.isDev
       ? { transport: { target: 'pino-pretty', options: { colorize: true } } }
@@ -52,22 +59,26 @@ export async function buildApp() {
   await app.register(recapRoutes, { prefix: '/events' })
   await app.register(exportRoutes, { prefix: '/' })
   await app.register(exportJobRoutes, { prefix: '/export-jobs' })
+  await app.register(adminRoutes, { prefix: '/admin' })
 
-  // Event state auto-transition scheduler + BullMQ mission worker
-  const schedulerTimer = startEventScheduler(app.log)
-  startMissionWorker(app.log)
-  startRevealWorker(app.log)
-  startRecapWorker(app.log)
-  startExportWorker(app.log)
-  startNotificationWorker(app.log)
-  app.addHook('onClose', async () => {
-    clearInterval(schedulerTimer)
-    await stopMissionWorker()
-    await stopRevealWorker()
-    await stopRecapWorker()
-    await stopExportWorker()
-    await stopNotificationWorker()
-  })
+  if (startBackgroundServices) {
+    // Local/dev convenience. Production should run `npm run start:worker`
+    // as a separate process and set RUN_BACKGROUND_JOBS=false for the API.
+    const schedulerTimer = startEventScheduler(app.log)
+    startMissionWorker(app.log)
+    startRevealWorker(app.log)
+    startRecapWorker(app.log)
+    startExportWorker(app.log)
+    startNotificationWorker(app.log)
+    app.addHook('onClose', async () => {
+      clearInterval(schedulerTimer)
+      await stopMissionWorker()
+      await stopRevealWorker()
+      await stopRecapWorker()
+      await stopExportWorker()
+      await stopNotificationWorker()
+    })
+  }
 
   return app
 }

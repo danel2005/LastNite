@@ -1,5 +1,6 @@
 import axios from 'axios'
 import * as SecureStore from 'expo-secure-store'
+import { useAuthStore } from '@/stores/auth-store'
 
 const API_URL = process.env['EXPO_PUBLIC_API_URL'] ?? 'http://localhost:3001'
 
@@ -23,8 +24,7 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error: unknown) => {
     if (axios.isAxiosError(error) && error.response?.status === 401) {
-      await SecureStore.deleteItemAsync('session_token')
-      // Navigation handled by auth store subscription
+      await useAuthStore.getState().clearSession()
     }
     return Promise.reject(error)
   },

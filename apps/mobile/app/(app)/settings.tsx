@@ -15,12 +15,15 @@ import {
   Alert,
   ActivityIndicator,
   ScrollView,
+  Image,
 } from 'react-native'
+import * as ImagePicker from 'expo-image-picker'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { colors, spacing, borderRadius, typography } from '@/lib/design'
 import { useAuthStore } from '@/stores/auth-store'
+import { useThemeStore } from '@/stores/theme-store'
 import { apiClient } from '@/lib/api-client'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -148,7 +151,11 @@ const isSt = StyleSheet.create({
 
 export default function SettingsScreen() {
   const profile = useAuthStore((s) => s.profile)
+  const user = useAuthStore((s) => s.user)
+  const setProfile = useAuthStore((s) => s.setProfile)
   const clearSession = useAuthStore((s) => s.clearSession)
+  const themeMode = useThemeStore((s) => s.mode)
+  const setThemeMode = useThemeStore((s) => s.setMode)
   const qc = useQueryClient()
 
   const { data: prefsData, isLoading: prefsLoading } = useQuery<Preferences>({
@@ -165,7 +172,7 @@ export default function SettingsScreen() {
     if (prefsData && !localPrefs) {
       setLocalPrefs(prefsData)
     }
-  }, [prefsData]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [prefsData])
 
   const saveMutation = useMutation({
     mutationFn: async (prefs: Partial<Preferences>) => {
@@ -199,6 +206,49 @@ export default function SettingsScreen() {
     ])
   }
 
+  async function chooseProfilePhoto(source: 'camera' | 'gallery') {
+    try {
+      const permission =
+        source === 'camera'
+          ? await ImagePicker.requestCameraPermissionsAsync()
+          : await ImagePicker.requestMediaLibraryPermissionsAsync()
+
+      if (!permission.granted) {
+        Alert.alert('Permission needed', 'Allow access to set your profile picture.')
+        return
+      }
+
+      const result =
+        source === 'camera'
+          ? await ImagePicker.launchCameraAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              allowsEditing: true,
+              aspect: [1, 1],
+              quality: 0.8,
+            })
+          : await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              allowsEditing: true,
+              aspect: [1, 1],
+              quality: 0.8,
+            })
+
+      if (result.canceled || !result.assets[0]?.uri || !profile) return
+
+      const avatarStorageKey = result.assets[0].uri
+      const res = await apiClient.put('/me', { avatarStorageKey })
+      const updated = (res.data as { profile: typeof profile }).profile
+      setProfile({ ...updated, avatarStorageKey })
+    } catch {
+      Alert.alert('Error', 'Could not update your profile picture.')
+    }
+  }
+
+  function handleThemeToggle(lightMode: boolean) {
+    setThemeMode(lightMode ? 'light' : 'dark')
+    Alert.alert('Theme saved', 'Your color-mode preference is saved.')
+  }
+
   const saving = saveMutation.isPending
   const prefs = localPrefs ?? prefsData
 
@@ -208,16 +258,43 @@ export default function SettingsScreen() {
         {/* Profile card */}
         <View style={s.profileCard}>
           <View style={s.avatar}>
-            <Text style={s.avatarText}>
-              {(profile?.displayName?.[0] ?? '?').toUpperCase()}
-            </Text>
+            {profile?.avatarStorageKey ? (
+              <Image source={{ uri: profile.avatarStorageKey }} style={s.avatarImage} />
+            ) : (
+              <Text style={s.avatarText}>
+                {(profile?.displayName?.[0] ?? '?').toUpperCase()}
+              </Text>
+            )}
           </View>
           <View>
             <Text style={s.displayName}>{profile?.displayName ?? 'Unknown'}</Text>
-            <Text style={s.subtext}>Participant</Text>
+            <Text style={s.subtext}>{user?.isAdmin ? 'Admin' : 'Participant'}</Text>
           </View>
           {saving && <ActivityIndicator color={colors.accent} size="small" style={{ marginLeft: 'auto' }} />}
         </View>
+
+        <View style={s.photoActions}>
+          <TouchableOpacity style={s.smallButton} onPress={() => chooseProfilePhoto('camera')}>
+            <Text style={s.smallButtonText}>Camera</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.smallButton} onPress={() => chooseProfilePhoto('gallery')}>
+            <Text style={s.smallButtonText}>Gallery</Text>
+          </TouchableOpacity>
+        </View>
+
+        {user?.isAdmin && (
+          <TouchableOpacity style={s.adminButton} onPress={() => router.push('/(app)/admin' as never)}>
+            <Text style={s.adminButtonText}>Open Admin Console</Text>
+          </TouchableOpacity>
+        )}
+
+        <SectionHeader title="APPEARANCE" />
+        <ToggleRow
+          label="Light mode"
+          description="Saved for this device. Reopen the app to refresh older screens."
+          value={themeMode === 'light'}
+          onChange={handleThemeToggle}
+        />
 
         {/* Mission opt-out preferences */}
         <SectionHeader title="MISSION PREFERENCES" />
@@ -292,10 +369,31 @@ const s = StyleSheet.create({
     borderColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
+  avatarImage: { width: '100%', height: '100%' },
   avatarText: { color: colors.accent, fontSize: 22, fontWeight: '700' },
   displayName: { ...typography.heading3, color: colors.text },
   subtext: { ...typography.bodySmall, color: colors.textSecondary },
+  photoActions: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
+  smallButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+    backgroundColor: colors.bgCard,
+  },
+  smallButtonText: { color: colors.text, fontWeight: '700' },
+  adminButton: {
+    marginTop: spacing.sm,
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+  },
+  adminButtonText: { color: colors.onPrimary, fontSize: 15, fontWeight: '800' },
   loadingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.md },
   loadingText: { ...typography.bodySmall, color: colors.textSecondary },
   intensitySection: {

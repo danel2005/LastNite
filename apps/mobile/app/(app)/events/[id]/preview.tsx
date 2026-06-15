@@ -20,9 +20,7 @@ import {
   Image,
   TouchableOpacity,
   StyleSheet,
-  ActivityIndicator,
   AppState,
-  Platform,
 } from 'react-native'
 import { router, useLocalSearchParams } from 'expo-router'
 import * as FileSystem from 'expo-file-system'
@@ -81,6 +79,8 @@ async function uploadSubmission(
   signal: AbortSignal,
 ): Promise<void> {
   const mimeType = getMimeType(mediaUri, mediaType)
+  const fileInfo = await FileSystem.getInfoAsync(mediaUri)
+  const fileSizeBytes = fileInfo.exists && 'size' in fileInfo ? fileInfo.size : 1
   const MAX_RETRIES = 3
   let lastError: Error | null = null
 
@@ -93,8 +93,9 @@ async function uploadSubmission(
       // Step 1: Init submission — get upload URL
       const initRes = await apiClient.post(`/events/${eventId}/submissions/init`, {
         assignmentId,
-        mediaType,
+        assetType: mediaType,
         mimeType,
+        fileSizeBytes,
       })
       const { submissionId, uploadUrl } = initRes.data as {
         submissionId: string
@@ -244,6 +245,7 @@ export default function PreviewScreen() {
       }, 1800)
       return () => clearTimeout(timeout)
     }
+    return undefined
   }, [uploadState.phase, eventId])
 
   // ── Render ────────────────────────────────────────────────────────────────

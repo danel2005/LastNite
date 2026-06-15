@@ -327,10 +327,13 @@ export async function inviteRoutes(app: FastifyInstance) {
 
   app.post('/:code/join', async (request, reply) => {
     const userId = request.user.sub
-    const { code } = request.params as { code: string }
+    const { code: rawCode } = request.params as { code: string }
+    const code = rawCode.trim()
 
     // Look up invite first; also check event's own invite code
-    const invite = await prisma.invite.findUnique({ where: { code } })
+    const invite = await prisma.invite.findFirst({
+      where: { code: { equals: code, mode: 'insensitive' } },
+    })
 
     let eventId: string
 
@@ -338,7 +341,9 @@ export async function inviteRoutes(app: FastifyInstance) {
       eventId = invite.eventId
     } else {
       // Check if it's the event's own inviteCode
-      const event = await prisma.event.findFirst({ where: { inviteCode: code, deletedAt: null } })
+      const event = await prisma.event.findFirst({
+        where: { inviteCode: { equals: code, mode: 'insensitive' }, deletedAt: null },
+      })
       if (!event) {
         return reply.status(404).send({ error: 'Invalid invite code' })
       }

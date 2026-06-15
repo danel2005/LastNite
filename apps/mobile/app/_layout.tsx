@@ -6,6 +6,7 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native'
 import { queryClient } from '@/lib/query-client'
 import { useAuthStore } from '@/stores/auth-store'
+import { useThemeStore } from '@/stores/theme-store'
 import { apiClient } from '@/lib/api-client'
 import { colors, spacing, typography } from '@/lib/design'
 
@@ -68,17 +69,19 @@ const ebSt = StyleSheet.create({
 export default function RootLayout() {
   const loadSession = useAuthStore((s) => s.loadSession)
   const setSession = useAuthStore((s) => s.setSession)
+  const loadMode = useThemeStore((s) => s.loadMode)
 
   useEffect(() => {
+    loadMode()
     // On app start: load token from SecureStore, then verify it with /me
     loadSession().then(async (token) => {
       if (!token) return
       try {
         const res = await apiClient.get('/me')
-        const data = res.data as { id: string; phone: string | null; email: string | null; createdAt?: string; updatedAt?: string; profile: null | Record<string, unknown> }
+        const data = res.data as { id: string; phone: string | null; email: string | null; createdAt?: string; updatedAt?: string; isAdmin?: boolean; profile: null | Record<string, unknown> }
         const now = new Date().toISOString()
         await setSession(
-          { id: data.id, phone: data.phone ?? null, email: data.email ?? null, createdAt: data.createdAt ?? now, updatedAt: data.updatedAt ?? now },
+          { id: data.id, phone: data.phone ?? null, email: data.email ?? null, createdAt: data.createdAt ?? now, updatedAt: data.updatedAt ?? now, isAdmin: data.isAdmin },
           data.profile as never,
           token,
         )

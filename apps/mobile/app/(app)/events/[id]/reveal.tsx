@@ -136,7 +136,7 @@ function DramaticCountdown({ onDone }: { onDone: () => void }) {
       })
     }
     tick(count)
-  }, [count]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [count])
 
   return (
     <View style={cSt.overlay}>
@@ -532,7 +532,7 @@ export default function RevealScreen() {
     if (revealData && !revealReady) {
       setShowCountdown(true)
     }
-  }, [!!revealData]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [!!revealData])
 
   const handleCountdownDone = useCallback(() => {
     setShowCountdown(false)

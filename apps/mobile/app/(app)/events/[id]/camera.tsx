@@ -11,7 +11,7 @@
  *   eventId      — needed for upload in preview screen
  */
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
   View,
   Text,
@@ -189,7 +189,6 @@ export default function CameraScreen() {
 
   // ── Capture button label ──────────────────────────────────────────────────
   const isVideoMode = mediaType === 'video'
-  const showRecordToggle = isVideoMode
   const captureLabel = isVideoMode
     ? isRecording
       ? '⏹ Stop'

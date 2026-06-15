@@ -1,8 +1,7 @@
 import { useEffect } from 'react'
 import { Stack } from 'expo-router'
-import { router } from 'expo-router'
 import * as Notifications from 'expo-notifications'
-import { Platform, TouchableOpacity, Text, StyleSheet } from 'react-native'
+import { Platform } from 'react-native'
 import { apiClient } from '@/lib/api-client'
 import { useAuthStore } from '@/stores/auth-store'
 import { colors } from '@/lib/design'
@@ -37,33 +36,6 @@ async function registerPushToken() {
   }
 }
 
-function AvatarButton({ initial }: { initial: string }) {
-  return (
-    <TouchableOpacity
-      onPress={() => router.push('/(app)/settings')}
-      style={av.btn}
-      activeOpacity={0.7}
-    >
-      <Text style={av.text}>{initial}</Text>
-    </TouchableOpacity>
-  )
-}
-
-const av = StyleSheet.create({
-  btn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: 'rgba(204, 151, 255, 0.15)',
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 4,
-  },
-  text: { color: colors.primary, fontWeight: '700', fontSize: 14 },
-})
-
 const headerTheme = {
   headerStyle: { backgroundColor: colors.bg },
   headerTintColor: colors.text,
@@ -74,13 +46,13 @@ const headerTheme = {
 }
 
 export default function AppLayout() {
-  const profile = useAuthStore((s) => s.profile)
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
 
   useEffect(() => {
-    if (Platform.OS !== 'web') {
+    if (Platform.OS !== 'web' && isAuthenticated) {
       registerPushToken()
     }
-  }, [])
+  }, [isAuthenticated])
 
   return (
     <Stack screenOptions={headerTheme}>
@@ -101,6 +73,7 @@ export default function AppLayout() {
       <Stack.Screen name="events/[id]/camera" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
       <Stack.Screen name="events/[id]/preview" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
       <Stack.Screen name="events/[id]/export" options={{ title: 'Export & Share' }} />
+      <Stack.Screen name="admin" options={{ title: 'Admin' }} />
       <Stack.Screen name="settings" options={{ title: 'Settings' }} />
 
       {/* Legacy index — redirect entry point */}

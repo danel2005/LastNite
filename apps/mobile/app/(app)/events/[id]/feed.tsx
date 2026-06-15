@@ -13,7 +13,7 @@
  *   DELETE /submissions/:id/reactions/:reactionId
  */
 
-import { useState, useCallback, useRef } from 'react'
+import { useState } from 'react'
 import {
   View,
   Text,
@@ -31,7 +31,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router, useLocalSearchParams } from 'expo-router'
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query'
-import { colors, spacing, borderRadius, typography, shadows } from '@/lib/design'
+import { colors, spacing, borderRadius, typography } from '@/lib/design'
 import { apiClient } from '@/lib/api-client'
 import { useAuthStore } from '@/stores/auth-store'
 
@@ -190,11 +190,9 @@ const tileSt = StyleSheet.create({
 function ReactionStrip({
   reactions,
   onReact,
-  myUserId,
 }: {
   reactions: Reaction[]
   onReact: (emoji: ReactionEmoji, existingReactionId?: string) => void
-  myUserId?: string
 }) {
   return (
     <View style={rxSt.strip}>
@@ -240,13 +238,11 @@ const rxSt = StyleSheet.create({
 function FullscreenViewer({
   submission,
   eventLive,
-  myUserId,
   onClose,
   onReact,
 }: {
   submission: SubmissionFeedItem
   eventLive: boolean
-  myUserId?: string
   onClose: () => void
   onReact: (submissionId: string, emoji: ReactionEmoji, existingReactionId?: string) => void
 }) {
@@ -300,7 +296,6 @@ function FullscreenViewer({
           {/* Reactions */}
           <ReactionStrip
             reactions={submission.reactions}
-            myUserId={myUserId}
             onReact={(emoji, existingId) => onReact(submission.submissionId, emoji, existingId)}
           />
         </View>
@@ -624,7 +619,6 @@ export default function EventFeedScreen() {
         <FullscreenViewer
           submission={viewerSubmission}
           eventLive={eventLive}
-          myUserId={myUserId}
           onClose={() => setViewerSubmission(null)}
           onReact={handleReact}
         />

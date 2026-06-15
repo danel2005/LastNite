@@ -3,9 +3,11 @@ import { z } from 'zod'
 import { prisma } from '@lastnite/db'
 import { supabaseAdmin } from '../lib/supabase.js'
 import { env } from '../lib/env.js'
+import { isAdminRequest } from '../lib/admin.js'
 
 const updateProfileSchema = z.object({
   displayName: z.string().min(1).max(50).optional(),
+  avatarStorageKey: z.string().min(1).max(2000).nullable().optional(),
 })
 
 export async function meRoutes(app: FastifyInstance) {
@@ -29,6 +31,7 @@ export async function meRoutes(app: FastifyInstance) {
       phone: user.phone,
       email: user.email,
       profile: user.profile ?? null,
+      isAdmin: isAdminRequest(request),
     })
   })
 
@@ -41,7 +44,7 @@ export async function meRoutes(app: FastifyInstance) {
       return reply.status(400).send({ error: 'Validation error', issues: body.error.issues })
     }
 
-    const { displayName } = body.data
+    const { displayName, avatarStorageKey } = body.data
 
     const user = await prisma.user.findUnique({ where: { id: userId } })
     if (!user) {
@@ -53,9 +56,11 @@ export async function meRoutes(app: FastifyInstance) {
       create: {
         userId,
         displayName: displayName ?? `User${userId.slice(0, 4)}`,
+        avatarStorageKey: avatarStorageKey ?? null,
       },
       update: {
         ...(displayName !== undefined ? { displayName } : {}),
+        ...(avatarStorageKey !== undefined ? { avatarStorageKey } : {}),
       },
     })
 

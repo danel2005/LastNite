@@ -1,8 +1,8 @@
 /**
  * Tab Navigator — 5-tab bottom nav matching the LastNite UI design.
- * Tabs: Home | Events | [Camera FAB] | Feed | Profile
+ * Tabs: Home | Events | [Join FAB] | Feed | Profile
  *
- * Camera is a center FAB that pushes to the camera screen rather than
+ * Join is a center FAB that pushes to the join screen rather than
  * being a true tab — implemented as a custom tab button.
  */
 
@@ -15,7 +15,6 @@ import {
   StyleSheet,
   Platform,
 } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { colors, borderRadius } from '@/lib/design'
 
 // ─── Tab icon component ───────────────────────────────────────────────────────
@@ -57,10 +56,9 @@ const icon = StyleSheet.create({
   label: { fontSize: 9, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase' },
 })
 
-// ─── Camera FAB tab button ────────────────────────────────────────────────────
+// ─── Join FAB tab button ──────────────────────────────────────────────────────
 
-function CameraTabButton() {
-  const insets = useSafeAreaInsets()
+function JoinTabButton() {
   return (
     <View style={fab.container}>
       <TouchableOpacity
@@ -68,7 +66,7 @@ function CameraTabButton() {
         onPress={() => router.push('/(app)/events/join' as never)}
         activeOpacity={0.85}
       >
-        <Text style={fab.icon}>📸</Text>
+        <Text style={fab.icon}>＋</Text>
       </TouchableOpacity>
     </View>
   )
@@ -146,7 +144,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="camera"
         options={{
-          tabBarButton: () => <CameraTabButton />,
+          tabBarButton: () => <JoinTabButton />,
         }}
       />
       <Tabs.Screen

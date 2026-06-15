@@ -1,0 +1,8 @@
+process.env['NODE_ENV'] ??= 'test'
+process.env['RUN_BACKGROUND_JOBS'] ??= 'false'
+process.env['DATABASE_URL'] ??= 'postgresql://lastnite:lastnite@localhost:5433/lastnite_test'
+process.env['SUPABASE_URL'] ??= 'http://localhost:54321'
+process.env['SUPABASE_SERVICE_ROLE_KEY'] ??= 'test-service-role-key'
+process.env['SUPABASE_JWT_SECRET'] ??= 'test-jwt-secret-minimum-32-characters'
+process.env['REDIS_URL'] ??= 'redis://localhost:6379'
+process.env['STORAGE_BUCKET_MEDIA'] ??= 'event-media-test'

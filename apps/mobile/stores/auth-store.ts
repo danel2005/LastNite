@@ -7,12 +7,12 @@ const SESSION_TOKEN_KEY = 'session_token'
 interface AuthState {
   isAuthenticated: boolean
   isLoading: boolean
-  user: User | null
-  profile: Profile | null
+  user: (User & { isAdmin?: boolean }) | null
+  profile: (Profile & { avatarStorageKey?: string | null }) | null
   sessionToken: string | null
 
-  setSession: (user: User, profile: Profile | null, token: string) => Promise<void>
-  setProfile: (profile: Profile) => void
+  setSession: (user: User & { isAdmin?: boolean }, profile: (Profile & { avatarStorageKey?: string | null }) | null, token: string) => Promise<void>
+  setProfile: (profile: Profile & { avatarStorageKey?: string | null }) => void
   clearSession: () => Promise<void>
   loadSession: () => Promise<string | null>
 }

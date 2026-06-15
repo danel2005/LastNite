@@ -35,10 +35,11 @@ export default function VerifyScreen() {
       const data = res.data as {
         session: { accessToken: string }
         user: { id: string; phone: string | null; email: string | null }
+        isAdmin?: boolean
         profile: Profile | null
       }
       const now = new Date().toISOString()
-      const user: User = { id: data.user.id, phone: data.user.phone ?? null, email: data.user.email ?? null, createdAt: now, updatedAt: now }
+      const user: User & { isAdmin?: boolean } = { id: data.user.id, phone: data.user.phone ?? null, email: data.user.email ?? null, createdAt: now, updatedAt: now, isAdmin: data.isAdmin }
       await setSession(user, data.profile, data.session.accessToken)
 
       if (!data.profile?.displayName) {

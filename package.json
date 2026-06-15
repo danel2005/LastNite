@@ -8,10 +8,19 @@
   ],
   "scripts": {
     "build": "turbo build",
-    "dev": "turbo dev",
-    "mobile": "cd apps/mobile && npx expo start",
+    "dev": "npm run dev:all",
+    "dev:api": "npm run dev -w @lastnite/api",
+    "dev:worker": "npm run dev:worker -w @lastnite/api",
+    "dev:mobile": "npm run dev -w @lastnite/mobile -- --lan",
+    "dev:phone": "bash scripts/dev-phone.sh",
+    "dev:tunnel": "bash scripts/dev-tunnel.sh",
+    "dev:all": "concurrently -n api,mobile -c blue,magenta \"npm:dev:api\" \"npm:dev:mobile\"",
+    "mobile": "npm run dev:mobile",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
+    "test": "turbo test",
+    "test:api": "npm run test -w @lastnite/api",
+    "smoke": "tsx scripts/smoke-test.ts",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\" --ignore-path .gitignore",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,json,md}\" --ignore-path .gitignore",
     "db:generate": "turbo db:generate",
@@ -19,11 +28,14 @@
     "db:seed": "turbo db:seed"
   },
   "devDependencies": {
+    "concurrently": "^9.2.1",
     "prettier": "^3.3.3",
-    "turbo": "^2.3.3"
+    "tsx": "^4.21.0",
+    "turbo": "^2.3.3",
+    "vitest": "^3.2.4"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20.19"
   },
   "prettier": {
     "semi": false,

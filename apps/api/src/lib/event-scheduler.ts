@@ -2,6 +2,7 @@ import type { FastifyBaseLogger } from 'fastify'
 import { prisma } from '@lastnite/db'
 import type { EventState } from '@prisma/client'
 import { scheduleEventMissions } from '../jobs/mission-worker.js'
+import { getRevealQueue } from '../jobs/reveal-worker.js'
 
 const TICK_MS = 60_000 // run every 60 seconds
 
@@ -48,15 +49,34 @@ async function tick(log: FastifyBaseLogger) {
     if (toEnding.count > 0) log.info({ count: toEnding.count }, 'event-scheduler: live → ending')
 
     // ending → processing
-    const toProcessing = await prisma.event.updateMany({
+    const processingEvents = await prisma.event.findMany({
       where: {
         state: 'ending' as EventState,
         endsAt: { lte: now },
         deletedAt: null,
       },
-      data: { state: 'processing' },
+      select: { id: true },
     })
-    if (toProcessing.count > 0) log.info({ count: toProcessing.count }, 'event-scheduler: ending → processing')
+    if (processingEvents.length > 0) {
+      await prisma.event.updateMany({
+        where: { id: { in: processingEvents.map((event) => event.id) } },
+        data: { state: 'processing' },
+      })
+
+      const revealQueue = getRevealQueue()
+      for (const event of processingEvents) {
+        await revealQueue.add(
+          'compute-reveal',
+          { eventId: event.id },
+          { jobId: `reveal-${event.id}` },
+        )
+      }
+
+      log.info(
+        { count: processingEvents.length },
+        'event-scheduler: ending → processing; reveal jobs enqueued',
+      )
+    }
   } catch (err) {
     log.error({ err }, 'event-scheduler: tick failed')
   }

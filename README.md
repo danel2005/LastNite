@@ -35,6 +35,105 @@ The app should feel like a private disposable camera crossed with a secret missi
 
 ---
 
+## Current Reality
+
+This repo is a prototype/starter implementation, not a finished app. The main flows exist in code, but the status should be read as:
+
+- **Scaffold** — structure or screen exists, but needs real integration/testing.
+- **Working** — implemented enough to run manually.
+- **Tested** — covered by automated checks.
+
+The first stabilization target is boring on purpose: `npm run typecheck`, `npm run lint`, `npm run build`, and `npm run test` should stay green before adding more product surface.
+
+---
+
+## How To Run Locally
+
+1. Install dependencies:
+   ```bash
+   npm ci
+   ```
+2. Start local Postgres + Redis:
+   ```bash
+   docker compose -f docker-compose.dev.yml up -d
+   ```
+3. Copy env templates and fill Supabase values:
+   ```bash
+   cp .env.local.example .env.local
+   cp apps/api/.env.example apps/api/.env
+   cp apps/mobile/.env.example apps/mobile/.env
+   ```
+4. Prepare the database:
+   ```bash
+   npm run db:generate
+   npm run db:migrate
+   npm run db:seed
+   ```
+5. Run API + mobile:
+   ```bash
+   npm run dev:all
+   ```
+
+Useful single-process commands:
+
+- `npm run dev:api` — Fastify API.
+- `npm run dev:worker` — scheduler and BullMQ workers only.
+- `npm run dev:mobile` — Expo on LAN.
+- `npm run dev:tunnel` — optional API-only Cloudflare tunnel.
+
+For production/staging, run API and worker as separate processes. Set `RUN_BACKGROUND_JOBS=false` on the API service and run `npm run start:worker` in a separate worker service.
+
+---
+
+## Phone Testing
+
+Android is the first testing target.
+
+1. Use Expo Go first:
+   ```bash
+   npm run dev:phone
+   ```
+2. Keep the phone and laptop on the same Wi-Fi and use LAN mode when possible.
+3. If the phone cannot reach the local API, run:
+   ```bash
+   npm run dev:tunnel
+   EXPO_PUBLIC_API_URL=<printed-api-tunnel-url> npm run dev:phone
+   ```
+4. Move to EAS/dev-client builds once native config or non-Expo-Go testing becomes necessary.
+
+Avoid tunneling Expo itself unless LAN fails. Prefer a stable staging API URL for repeated testing.
+
+---
+
+## How To Test
+
+```bash
+npm run typecheck
+npm run lint
+npm run build
+npm run test
+```
+
+API tests use Vitest. The first tests cover app boot, auth protection, invite code generation, and event state rules. Use the local test database from `docker-compose.dev.yml` for DB-backed integration tests as they are added.
+
+Authenticated smoke testing:
+
+```bash
+API_URL=http://localhost:3001 ACCESS_TOKEN=<supabase-user-jwt> npm run smoke
+```
+
+---
+
+## Hosting Plan
+
+- **DB/Auth/Storage:** Supabase Free for dev/staging.
+- **API + worker:** Railway for tiny-budget deployment; split API and worker services.
+- **Redis:** Upstash Redis Free for staging/low-volume queues, or Railway Redis when colocating services.
+- **Mobile builds:** Expo EAS Free/dev builds first.
+- **SMS:** defer paid SMS. Use email OTP, test auth, and invite links while testing.
+
+---
+
 ## Repository Structure
 
 ```
@@ -496,26 +595,26 @@ This is the emotional climax of the app.
 
 | Step | Branch | Status |
 |---|---|---|
-| Step 01 | `step/01-monorepo-setup` | ✅ Done |
-| Step 02 | `step/02-database-schema` | ✅ Done |
-| Step 03 | `step/03-backend-auth` | ✅ Done |
-| Step 04 | `step/04-event-crud` | ✅ Done |
-| Step 05 | `step/05-mission-engine` | ✅ Done |
-| Step 06 | `step/06-live-event-api` | ✅ Done |
-| Step 07 | `step/07-media-upload` | ✅ Done |
-| Step 08 | `step/08-event-feed-api` | ✅ Done |
-| Step 09 | `step/09-event-close-and-reveal` | ✅ Done |
-| Step 10 | `step/10-recap-generation` | ✅ Done |
-| Step 11 | `step/11-export-system` | ✅ Done |
-| Step 12 | `step/12-notifications` | ✅ Done |
-| Step 13 | `step/13-mobile-foundation` | ✅ Done |
-| Step 14 | `step/14-mobile-event-screens` | ✅ Done |
-| Step 15 | `step/15-mobile-live-event` | ✅ Done |
-| Step 16 | `step/16-mobile-camera` | ✅ Done |
-| Step 17 | `step/17-mobile-feed` | ✅ Done |
-| Step 18 | `step/18-mobile-reveal-and-recap` | ✅ Done |
-| Step 19 | `step/19-mobile-export` | ✅ Done |
-| Step 20 | `step/20-safety-and-polish` | ✅ Done |
+| Step 01 | `step/01-monorepo-setup` | Working |
+| Step 02 | `step/02-database-schema` | Working |
+| Step 03 | `step/03-backend-auth` | Scaffold |
+| Step 04 | `step/04-event-crud` | Working |
+| Step 05 | `step/05-mission-engine` | Scaffold |
+| Step 06 | `step/06-live-event-api` | Scaffold |
+| Step 07 | `step/07-media-upload` | Scaffold |
+| Step 08 | `step/08-event-feed-api` | Scaffold |
+| Step 09 | `step/09-event-close-and-reveal` | Working |
+| Step 10 | `step/10-recap-generation` | Scaffold |
+| Step 11 | `step/11-export-system` | Scaffold |
+| Step 12 | `step/12-notifications` | Scaffold |
+| Step 13 | `step/13-mobile-foundation` | Working |
+| Step 14 | `step/14-mobile-event-screens` | Scaffold |
+| Step 15 | `step/15-mobile-live-event` | Scaffold |
+| Step 16 | `step/16-mobile-camera` | Scaffold |
+| Step 17 | `step/17-mobile-feed` | Scaffold |
+| Step 18 | `step/18-mobile-reveal-and-recap` | Scaffold |
+| Step 19 | `step/19-mobile-export` | Scaffold |
+| Step 20 | `step/20-safety-and-polish` | Scaffold |
 
 ---
 

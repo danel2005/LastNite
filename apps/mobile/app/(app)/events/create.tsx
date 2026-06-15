@@ -11,6 +11,7 @@ import {
   Switch,
   Share,
 } from 'react-native'
+import DateTimePicker from '@react-native-community/datetimepicker'
 import { router } from 'expo-router'
 import { colors, spacing, borderRadius, typography } from '@/lib/design'
 import { apiClient } from '@/lib/api-client'
@@ -55,11 +56,12 @@ function addHours(d: Date, h: number): Date {
   return new Date(d.getTime() + h * 3600_000)
 }
 
-function formatDateTime(d: Date): string {
-  return d.toLocaleString(undefined, {
-    month: 'short', day: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  })
+function formatDate(d: Date): string {
+  return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+}
+
+function formatTime(d: Date): string {
+  return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
 }
 
 // ─── Step dots ────────────────────────────────────────────────────────────────
@@ -87,6 +89,7 @@ export default function CreateEventScreen() {
   const [step, setStep] = useState(0)
   const [loading, setLoading] = useState(false)
   const [createdEvent, setCreatedEvent] = useState<Event | null>(null)
+  const [picker, setPicker] = useState<null | { field: 'startsAt' | 'endsAt'; mode: 'date' | 'time' }>(null)
   const [form, setForm] = useState<EventForm>({
     title: '',
     startsAt: now,
@@ -101,6 +104,19 @@ export default function CreateEventScreen() {
 
   function update<K extends keyof EventForm>(key: K, val: EventForm[K]) {
     setForm((f) => ({ ...f, [key]: val }))
+  }
+
+  function updateDate(field: 'startsAt' | 'endsAt', date: Date) {
+    setForm((current) => {
+      const next = { ...current, [field]: date }
+      if (field === 'startsAt' && date >= current.endsAt) {
+        next.endsAt = addHours(date, 4)
+      }
+      if (field === 'endsAt' && date <= current.startsAt) {
+        next.endsAt = addHours(current.startsAt, 1)
+      }
+      return next
+    })
   }
 
   async function createEvent() {
@@ -150,49 +166,40 @@ export default function CreateEventScreen() {
         />
 
         <Text style={s.label}>Starts</Text>
-        <View style={s.dateRow}>
-          <Text style={s.dateText}>{formatDateTime(form.startsAt)}</Text>
-          <View style={s.dateButtons}>
-            <TouchableOpacity style={s.dateBtn} onPress={() => {
-              const next = new Date(form.startsAt)
-              next.setHours(next.getHours() - 1)
-              if (next > new Date()) {
-                update('startsAt', next)
-              }
-            }}>
-              <Text style={s.dateBtnText}>-1h</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={s.dateBtn} onPress={() => {
-              const next = new Date(form.startsAt)
-              next.setHours(next.getHours() + 1)
-              update('startsAt', next)
-              if (next >= form.endsAt) update('endsAt', addHours(next, 4))
-            }}>
-              <Text style={s.dateBtnText}>+1h</Text>
-            </TouchableOpacity>
-          </View>
+        <View style={s.pickerRow}>
+          <TouchableOpacity style={s.pickerButton} onPress={() => setPicker({ field: 'startsAt', mode: 'date' })}>
+            <Text style={s.pickerLabel}>Date</Text>
+            <Text style={s.pickerValue}>{formatDate(form.startsAt)}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.pickerButton} onPress={() => setPicker({ field: 'startsAt', mode: 'time' })}>
+            <Text style={s.pickerLabel}>Time</Text>
+            <Text style={s.pickerValue}>{formatTime(form.startsAt)}</Text>
+          </TouchableOpacity>
         </View>
 
         <Text style={s.label}>Ends</Text>
-        <View style={s.dateRow}>
-          <Text style={s.dateText}>{formatDateTime(form.endsAt)}</Text>
-          <View style={s.dateButtons}>
-            <TouchableOpacity style={s.dateBtn} onPress={() => {
-              const next = new Date(form.endsAt)
-              next.setHours(next.getHours() - 1)
-              if (next > form.startsAt) update('endsAt', next)
-            }}>
-              <Text style={s.dateBtnText}>-1h</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={s.dateBtn} onPress={() => {
-              const next = new Date(form.endsAt)
-              next.setHours(next.getHours() + 1)
-              update('endsAt', next)
-            }}>
-              <Text style={s.dateBtnText}>+1h</Text>
-            </TouchableOpacity>
-          </View>
+        <View style={s.pickerRow}>
+          <TouchableOpacity style={s.pickerButton} onPress={() => setPicker({ field: 'endsAt', mode: 'date' })}>
+            <Text style={s.pickerLabel}>Date</Text>
+            <Text style={s.pickerValue}>{formatDate(form.endsAt)}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.pickerButton} onPress={() => setPicker({ field: 'endsAt', mode: 'time' })}>
+            <Text style={s.pickerLabel}>Time</Text>
+            <Text style={s.pickerValue}>{formatTime(form.endsAt)}</Text>
+          </TouchableOpacity>
         </View>
+
+        {picker && (
+          <DateTimePicker
+            value={form[picker.field]}
+            mode={picker.mode}
+            minimumDate={picker.field === 'startsAt' ? new Date() : form.startsAt}
+            onChange={(_, selectedDate) => {
+              setPicker(null)
+              if (selectedDate) updateDate(picker.field, selectedDate)
+            }}
+          />
+        )}
 
         <TouchableOpacity
           style={[s.nextButton, !form.title.trim() && s.buttonDisabled]}
@@ -392,6 +399,17 @@ const s = StyleSheet.create({
     paddingVertical: 4,
   },
   dateBtnText: { color: colors.textSecondary, fontSize: 12, fontWeight: '600' },
+  pickerRow: { flexDirection: 'row', gap: spacing.sm },
+  pickerButton: {
+    flex: 1,
+    backgroundColor: colors.bgCard,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+  },
+  pickerLabel: { ...typography.label, color: colors.textTertiary, marginBottom: spacing.xs },
+  pickerValue: { ...typography.body, color: colors.text, fontWeight: '700' },
   nextButton: {
     flex: 1,
     backgroundColor: colors.accent,

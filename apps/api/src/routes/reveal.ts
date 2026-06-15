@@ -30,7 +30,7 @@ export async function revealRoutes(app: FastifyInstance) {
 
     // Enqueue reveal computation job
     const queue = getRevealQueue()
-    await queue.add('compute-reveal', { eventId })
+    await queue.add('compute-reveal', { eventId }, { jobId: `reveal-${eventId}` })
 
     return reply.status(202).send({ ok: true, message: 'Event closed. Reveal is being computed...' })
   })
